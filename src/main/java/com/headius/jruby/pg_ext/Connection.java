@@ -85,7 +85,7 @@ public class Connection extends RubyObject {
     public IRubyObject initialize(ThreadContext context, IRubyObject[] args) {
         String host = "localhost";
         String dbname = null;
-        int port = 5740;
+        int port = 5432;
         String user = "root";
         String password = "";
 
@@ -107,9 +107,7 @@ public class Connection extends RubyObject {
             props.setProperty("user", user);
             props.setProperty("password", password);
 
-            connection = (PGConnection)driver.connect("jdbc:postgresl://" + host + ":" + port + "/" + dbname, props);
-//            System.out.println(Arrays.toString(connection.getNotifications()));
-            System.out.println(connection);
+            connection = (PGConnection)driver.connect("jdbc:postgresql://" + host + ":" + port + "/" + dbname, props);
             jdbcConnection = (java.sql.Connection)connection;
         } catch (SQLException sqle) {
             throw context.runtime.newRuntimeError(sqle.getLocalizedMessage());
@@ -247,7 +245,7 @@ public class Connection extends RubyObject {
         ResultSet set = null;
 
         try {
-            Statement statement = jdbcConnection.createStatement();
+            Statement statement = jdbcConnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE);
             statement.execute(query);
 
             set = statement.getResultSet();

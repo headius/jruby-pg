@@ -2,14 +2,18 @@ package com.headius.jruby.pg_ext;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
+import org.jruby.RubyHash;
 import org.jruby.RubyModule;
 import org.jruby.RubyObject;
 import org.jruby.anno.JRubyMethod;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 
 public class Result extends RubyObject {
     public Result(Ruby ruby, RubyClass rubyClass, ResultSet resultSet) {
@@ -24,7 +28,7 @@ public class Result extends RubyObject {
         result.includeModule(ruby.getEnumerable());
         result.includeModule(constants);
 
-        result.defineAnnotatedMethods(Connection.class);
+        result.defineAnnotatedMethods(Result.class);
     }
 
     /******     PG::Result INSTANCE METHODS: libpq     ******/
@@ -153,12 +157,40 @@ public class Result extends RubyObject {
 
     @JRubyMethod(name = "[]")
     public IRubyObject op_aref(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
+        Ruby runtime = context.runtime;
+        int index = (int)arg0.convertToInteger().getLongValue();
+
+        try {
+            jdbcResultSet.absolute(index);
+            ResultSetMetaData metaData = jdbcResultSet.getMetaData();
+            return currentRowToHash(runtime, metaData, jdbcResultSet);
+        } catch (Exception e) {
+            throw context.runtime.newRuntimeError(e.getLocalizedMessage());
+        }
+    }
+
+    private static RubyHash currentRowToHash(Ruby runtime, ResultSetMetaData metaData, ResultSet resultSet) throws SQLException {
+        RubyHash hash = RubyHash.newHash(runtime);
+
+        for (int i = 1; i <= metaData.getColumnCount(); i++) {
+            hash.put(metaData.getColumnName(i), resultSet.getObject(i));
+        }
+
+        return hash;
     }
 
     @JRubyMethod
-    public IRubyObject each(ThreadContext context) {
-        return context.nil;
+    public IRubyObject each(ThreadContext context, Block block) {
+        Ruby runtime = context.runtime;
+        try {
+            ResultSetMetaData metaData = jdbcResultSet.getMetaData();
+            while (jdbcResultSet.next()) {
+                block.yieldSpecific(context, currentRowToHash(runtime, metaData, jdbcResultSet));
+            }
+        } catch (Exception e) {
+            throw context.runtime.newRuntimeError(e.getLocalizedMessage());
+        }
+        return this;
     }
 
     @JRubyMethod
