@@ -1,3 +1,4 @@
 *~
 tmp/
 pg.gemspec
+pg_ext.jar
