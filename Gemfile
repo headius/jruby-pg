@@ -10,6 +10,7 @@ gem "hoe-bundler", ">=1.1", :group => [:development, :test]
 gem "hoe-gemspec", ">=1.0", :group => [:development, :test]
 gem "rake", ">=0.9", :group => [:development, :test]
 gem "rake-compiler", "=0.8.0", :group => [:development, :test]
+gem "git", ">=0", :group => [:development, :test]
 gem "rspec", ">=0", :group => [:development, :test]
 gem "hoe", "~>3.1", :group => [:development, :test]
 
