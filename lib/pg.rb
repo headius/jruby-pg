@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 if RUBY_PLATFORM == 'java'
-  require 'pg/pg'
+  require 'pg_ext'
   require 'jruby'
   com.headius.jruby.pg_ext.Postgresql.new.load(JRuby.runtime, false)
 else

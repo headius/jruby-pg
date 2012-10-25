@@ -2,6 +2,7 @@
 
 require 'rubygems'
 require 'hoe'
+require 'git'
 
 Hoe.plugin :gemspec
 Hoe.plugin :bundler
@@ -19,6 +20,7 @@ HOE = Hoe.spec 'pg' do
                           ["hoe-gemspec",     ">= 1.0"],
                           ["rake",            ">= 0.9"],
                           ["rake-compiler",   "=  0.8.0"],
+                          ["git"],
                           ["rspec"]
                          ]
 
@@ -26,10 +28,10 @@ HOE = Hoe.spec 'pg' do
 end
 
 require "rake/javaextensiontask"
-Rake::JavaExtensionTask.new("pg", HOE.spec) do |ext|
+Rake::JavaExtensionTask.new("pg_ext", HOE.spec) do |ext|
   jruby_home = RbConfig::CONFIG['prefix']
   ext.ext_dir = 'ext/java'
-  ext.lib_dir = 'lib/pg'
+  ext.lib_dir = 'lib'
   jars = ["#{jruby_home}/lib/jruby.jar"] + FileList['lib/*.jar']
   ext.classpath = jars.map { |x| File.expand_path x }.join ':'
 end
@@ -37,8 +39,22 @@ end
 gem_build_path = File.join 'pkg', HOE.spec.full_name
 
 task gem_build_path => [:compile] do
-  cp 'lib/pg/pg.jar', File.join(gem_build_path, 'lib', 'pg')
-  HOE.spec.files += ['lib/pg/pg.jar']
+  cp 'lib/pg_ext.jar', File.join(gem_build_path, 'lib', 'pg')
+  HOE.spec.files += ['lib/pg_ext.jar']
 end
+
+def remote
+  "git@github.com:jvshahid/ruby-pg.git"
+end
+
+desc 'fetch the specs from the ruby-pg repo'
+file 'ruby-pg-spec' do
+  FileUtils.rm_rf '/tmp/checkout'
+  g = Git.clone(remote, '/tmp/checkout', :log => STDOUT)
+  g.branch 'fix_path_to_pg_binaries'
+  FileUtils.mv Dir.glob('/tmp/checkout/spec/*'), 'spec/'
+end
+
+Rake::Task[:spec].prerequisites << 'ruby-pg-spec'
 
 # vim: syntax=ruby
