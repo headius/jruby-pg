@@ -1,8 +1,8 @@
 #!/usr/bin/env ruby
 
 if RUBY_PLATFORM == 'java'
+  require 'pg/pg'
   require 'jruby'
-  require 'jruby-pg-1.0.jar'
   com.headius.jruby.pg_ext.Postgresql.new.load(JRuby.runtime, false)
 else
   begin
