@@ -376,7 +376,7 @@ describe PG::Connection do
 		@conn.wait_for_notify( 10 ).should == 'woo'
 		@conn.exec( 'UNLISTEN woo' )
 
-		t.join
+    t.join
 	end
 
 	it "calls a block for NOTIFY events if one is given" do
@@ -400,7 +400,7 @@ describe PG::Connection do
 
 		@conn.exec( 'UNLISTEN woo' )
 
-		t.join
+    t.join
 	end
 
 	it "doesn't collapse sequential notifications" do
