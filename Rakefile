@@ -43,7 +43,7 @@ end
 gem_build_path = File.join 'pkg', HOE.spec.full_name
 
 task gem_build_path => [:compile] do
-  cp 'lib/pg_ext.jar', File.join(gem_build_path, 'lib', 'pg')
+  cp 'lib/pg_ext.jar', File.join(gem_build_path, 'lib')
   HOE.spec.files += ['lib/pg_ext.jar']
 end
 
