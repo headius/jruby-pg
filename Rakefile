@@ -27,6 +27,8 @@ HOE = Hoe.spec 'pg' do
                          ]
 
   self.spec_extras = { :platform => 'java' }
+
+  self.clean_globs = ['spec/*', 'tmp_test_specs', 'tmp']
 end
 
 require "rake/javaextensiontask"
