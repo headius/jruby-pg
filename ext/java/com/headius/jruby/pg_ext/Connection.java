@@ -5,6 +5,7 @@ import org.jruby.RubyClass;
 import org.jruby.RubyHash;
 import org.jruby.RubyModule;
 import org.jruby.RubyObject;
+import org.jruby.RubyString;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
@@ -86,10 +87,11 @@ public class Connection extends RubyObject {
         String host = "localhost";
         String dbname = null;
         int port = 5432;
-        String user = "root";
-        String password = "";
+        String user = null;
+        String password = null;
 
-        if (args.length >= 1 && args[0] instanceof RubyHash) {
+        if (args.length >= 1) {
+          if (args[0] instanceof RubyHash) {
             RubyHash hash = (RubyHash)args[0];
 
             host = (String)hash.get("host");
@@ -98,14 +100,38 @@ public class Connection extends RubyObject {
             password = (String)hash.get("password");
             Object portObj = hash.get("port");
             if (portObj != null) port = (int)(long)(Long)portObj;
+          } else if (args[0] instanceof RubyString) {
+            // we have a connection string, parse it
+            String connectionString = ((RubyString) args[0]).asJavaString();
+            String[] options = connectionString.split(" ");
+            for (String option : options) {
+              String[] keyValuePair = option.split("=");
+              if (keyValuePair.length != 2)
+                throw context.runtime.newRuntimeError("Connection string doesn't have the right format");
+              if (keyValuePair[0].equalsIgnoreCase("host") ||
+                  keyValuePair[0].equalsIgnoreCase("hostaddr")) {
+                host = keyValuePair[1];
+              } else if (keyValuePair[0].equals("port")) {
+                port = Integer.parseInt(keyValuePair[1]);
+              } else if (keyValuePair[0].equals("user")) {
+                user = keyValuePair[1];
+              } else if (keyValuePair[0].equals("password")) {
+                password = keyValuePair[1];
+              } else if (keyValuePair[0].equals("dbname")) {
+                dbname = keyValuePair[1];
+              }
+            }
+          }
         }
 
         try {
             Driver driver = DriverManager.getDriver("jdbc:postgresql");
 
             Properties props = new Properties();
-            props.setProperty("user", user);
-            props.setProperty("password", password);
+            if (user != null)
+              props.setProperty("user", user);
+            if (password != null)
+              props.setProperty("password", password);
 
             connection = (PGConnection)driver.connect("jdbc:postgresql://" + host + ":" + port + "/" + dbname, props);
             jdbcConnection = (java.sql.Connection)connection;
