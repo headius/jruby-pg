@@ -3,6 +3,7 @@
 require 'rubygems'
 require 'hoe'
 require 'git'
+require 'logger'
 
 Hoe.plugin :gemspec
 Hoe.plugin :bundler
@@ -21,6 +22,7 @@ HOE = Hoe.spec 'pg' do
                           ["rake",            ">= 0.9"],
                           ["rake-compiler",   "=  0.8.0"],
                           ["git"],
+                          ["logger"],
                           ["rspec"]
                          ]
 
