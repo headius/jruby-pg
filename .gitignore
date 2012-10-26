@@ -2,3 +2,4 @@
 tmp/
 pg.gemspec
 pg_ext.jar
+tmp_test_specs/
