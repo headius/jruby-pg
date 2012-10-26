@@ -48,7 +48,7 @@ task gem_build_path => [:compile] do
 end
 
 def remote
-  "git@github.com:jvshahid/ruby-pg.git"
+  "git://github.com/jvshahid/ruby-pg.git"
 end
 
 desc 'fetch the specs from the ruby-pg repo'
