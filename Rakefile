@@ -52,13 +52,15 @@ def remote
 end
 
 desc 'fetch the specs from the ruby-pg repo'
-file 'ruby-pg-spec' do
-  FileUtils.rm_rf '/tmp/checkout'
-  g = Git.clone(remote, '/tmp/checkout', :log => STDOUT)
-  g.branch 'fix_path_to_pg_binaries'
-  FileUtils.mv Dir.glob('/tmp/checkout/spec/*'), 'spec/'
+task 'get-ruby-pg-specs' do
+  if Dir.glob('spec/*').empty?
+    FileUtils.rm_rf '/tmp/checkout'
+    g = Git.clone(remote, '/tmp/checkout', :log => Logger.new(STDOUT))
+    g.checkout('fix_path_to_pg_binaries')
+    FileUtils.cp_r Dir.glob('/tmp/checkout/spec/*'), 'spec/'
+  end
 end
 
-Rake::Task[:spec].prerequisites << 'ruby-pg-spec'
+Rake::Task[:spec].prerequisites << 'get-ruby-pg-specs'
 
 # vim: syntax=ruby
