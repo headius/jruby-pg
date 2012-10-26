@@ -62,5 +62,6 @@ task 'get-ruby-pg-specs' do
 end
 
 Rake::Task[:spec].prerequisites << 'get-ruby-pg-specs'
+Rake::Task[:spec].prerequisites << :compile
 
 # vim: syntax=ruby
