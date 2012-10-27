@@ -167,7 +167,7 @@ public class Connection extends RubyObject {
         // host, port, options, tty, dbname, user, password
         argumentsHash.put("host", args[last_index].asJavaString());
         if (args.length >= last_index + 1)
-          argumentsHash.put("port", args[last_index + 1].toJava(Integer.class));
+          argumentsHash.put("port", ((RubyFixnum) args[last_index + 1]).to_s().toString());
         // FIXME: what is the options argument ?
         // FIXME: what is the tty argument ?
         if (args.length >= last_index + 4 && !args[last_index + 4].isNil())
