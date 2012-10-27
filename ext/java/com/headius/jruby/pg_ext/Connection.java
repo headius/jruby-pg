@@ -1,30 +1,33 @@
 package com.headius.jruby.pg_ext;
 
-import org.jruby.Ruby;
-import org.jruby.RubyClass;
-import org.jruby.RubyHash;
-import org.jruby.RubyInteger;
-import org.jruby.RubyModule;
-import org.jruby.RubyObject;
-import org.jruby.RubyString;
-import org.jruby.anno.JRubyMethod;
-import org.jruby.runtime.ObjectAllocator;
-import org.jruby.runtime.ThreadContext;
-import org.jruby.runtime.builtin.IRubyObject;
-import org.postgresql.PGConnection;
-
+import java.sql.DatabaseMetaData;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
-import java.util.Set;
+
+import org.jruby.Ruby;
+import org.jruby.RubyClass;
+import org.jruby.RubyException;
+import org.jruby.RubyFixnum;
+import org.jruby.RubyHash;
+import org.jruby.RubyModule;
+import org.jruby.RubyObject;
+import org.jruby.RubyString;
+import org.jruby.anno.JRubyMethod;
+import org.jruby.exceptions.RaiseException;
+import org.jruby.runtime.Block;
+import org.jruby.runtime.ObjectAllocator;
+import org.jruby.runtime.ThreadContext;
+import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.util.ByteList;
+import org.postgresql.PGConnection;
+import org.postgresql.largeobject.LargeObject;
+import org.postgresql.largeobject.LargeObjectManager;
 
 public class Connection extends RubyObject {
     public Connection(Ruby ruby, RubyClass rubyClass) {
@@ -121,7 +124,6 @@ public class Connection extends RubyObject {
             else
               connectionString = "jdbc:postgresql:" + dbname;
 
-            System.out.println(connectionString);
             connection = (PGConnection)driver.connect(connectionString, props);
             jdbcConnection = (java.sql.Connection)connection;
         } catch (SQLException sqle) {
@@ -285,7 +287,14 @@ public class Connection extends RubyObject {
 
     @JRubyMethod
     public IRubyObject server_version(ThreadContext context) {
-        return context.nil;
+      try {
+        DatabaseMetaData metaData = jdbcConnection.getMetaData();
+        int databaseMajorVersion = metaData.getDatabaseMajorVersion();
+        int databaseMinorVersion = metaData.getDatabaseMinorVersion();
+        return new RubyFixnum(context.runtime, databaseMajorVersion * 100000 + databaseMinorVersion * 1000);
+      } catch (SQLException e) {
+        throw context.runtime.newRuntimeError(e.getLocalizedMessage());
+      }
     }
 
     @JRubyMethod
@@ -514,9 +523,26 @@ public class Connection extends RubyObject {
         return context.nil;
     }
 
-    @JRubyMethod
-    public IRubyObject transaction(ThreadContext context) {
-        return context.nil;
+    @JRubyMethod()
+    public IRubyObject transaction(ThreadContext context, Block block) {
+      if (!block.isGiven())
+        throw context.runtime.newArgumentError("Must supply block for PG::Connection#transaction");
+
+      try {
+        try {
+          jdbcConnection.setAutoCommit(false);
+          block.call(context);
+          jdbcConnection.commit();
+        } catch (RuntimeException ex) {
+          jdbcConnection.rollback();
+          throw ex;
+        } finally {
+          jdbcConnection.setAutoCommit(true);
+        }
+      } catch (SQLException e) {
+        throw context.runtime.newRuntimeError(e.getLocalizedMessage());
+      }
+      return context.nil;
     }
 
     @JRubyMethod(rest = true)
@@ -546,14 +572,24 @@ public class Connection extends RubyObject {
 
     /******     PG::Connection INSTANCE METHODS: Large Object Support     ******/
 
-    @JRubyMethod(name = {"lo_creat", "locreat"}, rest = true)
+    @JRubyMethod(name = {"lo_creat", "locreat"}, optional = 1)
     public IRubyObject lo_creat(ThreadContext context, IRubyObject[] args) {
-        return context.nil;
+      try {
+        LargeObjectManager manager = connection.getLargeObjectAPI();
+        long oid;
+        if (args.length == 1)
+          oid = manager.createLO((Integer) args[0].toJava(Integer.class));
+        else
+          oid = manager.createLO();
+        return new RubyFixnum(context.runtime, oid);
+      } catch (SQLException e) {
+        throw newPgError(context, "lo_create failed");
+      }
     }
 
     @JRubyMethod(name = {"lo_create", "locreate"})
     public IRubyObject lo_create(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
+      return lo_creat(context, new IRubyObject[0]);
     }
 
     @JRubyMethod(name = {"lo_import", "loimport"})
@@ -566,24 +602,58 @@ public class Connection extends RubyObject {
         return context.nil;
     }
 
-    @JRubyMethod(name = {"lo_open", "loopen"}, rest = true)
-    public IRubyObject lo_open(ThreadContext context, IRubyObject[] args) {
-        return context.nil;
+    @JRubyMethod(name = {"lo_open", "loopen"}, required = 1, optional = 1)
+    public IRubyObject lo_open(ThreadContext context, IRubyObject [] args) {
+      try {
+        LargeObject object;
+        long oidLong = (Long) args[0].toJava(Long.class);
+        if (args.length == 1)
+          object = connection.getLargeObjectAPI().open(oidLong);
+        else
+          object = connection.getLargeObjectAPI().open(oidLong, (Integer) args[1].toJava(Integer.class));
+
+        return new LargeObjectFd(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::LargeObjectFd"), object);
+      } catch (SQLException e) {
+        throw newPgError(context, e.getLocalizedMessage());
+      }
     }
 
-    @JRubyMethod(name = {"lo_write", "lowrite"})
-    public IRubyObject lo_write(ThreadContext context, IRubyObject arg0, IRubyObject arg1) {
-        return context.nil;
+    @JRubyMethod(name = {"lo_write", "lowrite"}, required = 2, argTypes = {LargeObjectFd.class, RubyString.class})
+    public IRubyObject lo_write(ThreadContext context, IRubyObject object, IRubyObject buffer) {
+      try {
+        LargeObject largeObject = ((LargeObjectFd) object).getObject();
+        RubyString bufferString = (RubyString) buffer;
+        largeObject.write(bufferString.getBytes());
+        return bufferString.length();
+      } catch (SQLException e) {
+        throw newPgError(context, e.getLocalizedMessage());
+      }
     }
 
-    @JRubyMethod(name = {"lo_read", "loread"})
+    @JRubyMethod(name = {"lo_read", "loread"}, required = 2, argTypes = {LargeObjectFd.class, RubyFixnum.class})
     public IRubyObject lo_read(ThreadContext context, IRubyObject arg0, IRubyObject arg1) {
-        return context.nil;
+      try {
+        LargeObject largeObject = ((LargeObjectFd) arg0).getObject();
+        byte[] b = largeObject.read((int) ((RubyFixnum) arg1).getLongValue());
+        if (b.length == 0)
+          return context.nil;
+        return context.runtime.newString(new ByteList(b));
+      } catch (SQLException e) {
+        throw newPgError(context, e.getLocalizedMessage());
+      }
     }
 
-    @JRubyMethod(name = {"lo_lseek", "lolseek", "lo_seek", "loseek"})
-    public IRubyObject lo_lseek(ThreadContext context, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2) {
-        return context.nil;
+    @JRubyMethod(name = {"lo_lseek", "lolseek", "lo_seek", "loseek"}, required = 3,
+        argTypes = {LargeObjectFd.class, RubyFixnum.class, RubyFixnum.class})
+    public IRubyObject lo_lseek(ThreadContext context, IRubyObject object, IRubyObject offset, IRubyObject whence) {
+      try {
+        LargeObject largeObject = ((LargeObjectFd) object).getObject();
+        largeObject.seek((int) ((RubyFixnum) offset).getLongValue(),
+            (int) ((RubyFixnum) whence).getLongValue());
+        return new RubyFixnum(context.runtime, largeObject.tell());
+      } catch (SQLException e) {
+        throw newPgError(context, e.getLocalizedMessage());
+      }
     }
 
     @JRubyMethod(name = {"lo_tell", "lotell"})
@@ -634,6 +704,12 @@ public class Connection extends RubyObject {
             return new Connection(ruby, rubyClass);
         }
     };
+
+    private RaiseException newPgError(ThreadContext context, String message) {
+      RubyClass klass = context.runtime.getModule("PG").getClass("Error");
+      IRubyObject exception = klass.newInstance(context, context.runtime.newString(message), null);
+      return new RaiseException((RubyException) exception);
+    }
 
     java.sql.Connection jdbcConnection;
     PGConnection connection;

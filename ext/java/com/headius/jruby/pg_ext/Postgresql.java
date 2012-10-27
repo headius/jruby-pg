@@ -1,16 +1,17 @@
 package com.headius.jruby.pg_ext;
 
+import java.io.IOException;
+
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyFixnum;
-import org.jruby.RubyInteger;
 import org.jruby.RubyModule;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.load.Library;
-
-import java.io.IOException;
+import org.postgresql.largeobject.LargeObject;
+import org.postgresql.largeobject.LargeObjectManager;
 
 public class Postgresql implements Library {
     enum ConnectionStatus {
@@ -26,6 +27,13 @@ public class Postgresql implements Library {
         // create the connection status constants
         for(ConnectionStatus status : ConnectionStatus.values())
           pg.defineConstant(status.name(), new RubyFixnum(ruby, status.ordinal()));
+
+        // create the large object constants
+        pg.defineConstant("INV_READ", new RubyFixnum(ruby, LargeObjectManager.READ));
+        pg.defineConstant("INV_WRITE", new RubyFixnum(ruby, LargeObjectManager.WRITE));
+        pg.defineConstant("SEEK_SET", new RubyFixnum(ruby, LargeObject.SEEK_SET));
+        pg.defineConstant("SEEK_END", new RubyFixnum(ruby, LargeObject.SEEK_END));
+        pg.defineConstant("SEEK_CUR", new RubyFixnum(ruby, LargeObject.SEEK_CUR));
 
         pg.getSingletonClass().defineAnnotatedMethods(Postgresql.class);
 

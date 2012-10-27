@@ -2,6 +2,7 @@ package com.headius.jruby.pg_ext;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
+import org.jruby.RubyFixnum;
 import org.jruby.RubyHash;
 import org.jruby.RubyModule;
 import org.jruby.RubyObject;
@@ -27,6 +28,8 @@ public class Result extends RubyObject {
 
         result.includeModule(ruby.getEnumerable());
         result.includeModule(constants);
+
+        pg.defineClassUnder("LargeObjectFd", ruby.getObject(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
 
         result.defineAnnotatedMethods(Result.class);
     }
@@ -65,7 +68,17 @@ public class Result extends RubyObject {
 
     @JRubyMethod(name = {"ntuples", "num_tuples"})
     public IRubyObject ntuples(ThreadContext context) {
-        return context.nil;
+      // FIXME: this may not be the best way to count the result set, but I don't
+      // know of any other way
+      try {
+        int curr = jdbcResultSet.getRow();
+        jdbcResultSet.last();
+        int count = jdbcResultSet.getRow();
+        jdbcResultSet.absolute(curr);
+        return new RubyFixnum(context.runtime, count);
+      } catch (SQLException e) {
+        throw context.runtime.newRuntimeError(e.getLocalizedMessage());
+      }
     }
 
     @JRubyMethod(name = {"nfields", "num_fields"})
