@@ -325,7 +325,7 @@ public class Connection extends RubyObject {
     /******     PG::Connection INSTANCE METHODS: Command Execution     ******/
 
     @JRubyMethod(name = {"exec", "query"}, required = 1, optional = 2)
-    public IRubyObject exec(ThreadContext context, IRubyObject[] args) {
+    public IRubyObject exec(ThreadContext context, IRubyObject[] args, Block block) {
         String query = args[0].convertToString().toString();
         ResultSet set = null;
 
@@ -341,7 +341,10 @@ public class Connection extends RubyObject {
             throw context.runtime.newRuntimeError(sqle.getLocalizedMessage());
         }
 
-        return new Result(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::Result"), set);
+        Result result = new Result(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::Result"), set);
+        if (block.isGiven())
+          return block.call(context, result);
+        return result;
     }
 
     @JRubyMethod(rest = true)
