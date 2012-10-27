@@ -3,6 +3,7 @@ package com.headius.jruby.pg_ext;
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyHash;
+import org.jruby.RubyInteger;
 import org.jruby.RubyModule;
 import org.jruby.RubyObject;
 import org.jruby.RubyString;
@@ -18,7 +19,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.Set;
 
 public class Connection extends RubyObject {
     public Connection(Ruby ruby, RubyClass rubyClass) {
@@ -82,63 +88,94 @@ public class Connection extends RubyObject {
 
     /******     PG::Connection INSTANCE METHODS: Connection Control     ******/
 
-    @JRubyMethod(rest = true)
+    @JRubyMethod(rest = true, required = 1)
     public IRubyObject initialize(ThreadContext context, IRubyObject[] args) {
-        String host = "localhost";
+        String host = null;
         String dbname = null;
-        int port = 5432;
-        String user = null;
-        String password = null;
+        Integer port = null;
 
-        if (args.length >= 1) {
-          if (args[0] instanceof RubyHash) {
-            RubyHash hash = (RubyHash)args[0];
-
-            host = (String)hash.get("host");
-            dbname = (String)hash.get("dbname");
-            user = (String)hash.get("user");
-            password = (String)hash.get("password");
-            Object portObj = hash.get("port");
-            if (portObj != null) port = (int)(long)(Long)portObj;
-          } else if (args[0] instanceof RubyString) {
-            // we have a connection string, parse it
-            String connectionString = ((RubyString) args[0]).asJavaString();
-            String[] options = connectionString.split(" ");
-            for (String option : options) {
-              String[] keyValuePair = option.split("=");
-              if (keyValuePair.length != 2)
-                throw context.runtime.newRuntimeError("Connection string doesn't have the right format");
-              if (keyValuePair[0].equalsIgnoreCase("host") ||
-                  keyValuePair[0].equalsIgnoreCase("hostaddr")) {
-                host = keyValuePair[1];
-              } else if (keyValuePair[0].equals("port")) {
-                port = Integer.parseInt(keyValuePair[1]);
-              } else if (keyValuePair[0].equals("user")) {
-                user = keyValuePair[1];
-              } else if (keyValuePair[0].equals("password")) {
-                password = keyValuePair[1];
-              } else if (keyValuePair[0].equals("dbname")) {
-                dbname = keyValuePair[1];
-              }
-            }
+        Properties props = parse_args(context, args);
+        Iterator<Entry<Object, Object>> iterator = props.entrySet().iterator();
+        while (iterator.hasNext()) {
+          Entry<Object, Object> entry = iterator.next();
+          if (entry.getKey().equals("host") || entry.getKey().equals("hostaddr")) {
+            host = (String) entry.getValue();
+            iterator.remove();
+          } else if (entry.getKey().equals("port")) {
+            port = Integer.parseInt((String) entry.getValue());
+            iterator.remove();
+          } else if (entry.getKey().equals("dbname")) {
+            dbname = (String) entry.getValue();
+            iterator.remove();
           }
         }
 
         try {
             Driver driver = DriverManager.getDriver("jdbc:postgresql");
 
-            Properties props = new Properties();
-            if (user != null)
-              props.setProperty("user", user);
-            if (password != null)
-              props.setProperty("password", password);
+            String connectionString = "";
+            if (host != null && port != null)
+              connectionString = "jdbc:postgresql://" + host + ":" + port + "/" + dbname;
+            else if (host != null)
+              connectionString = "jdbc:postgresql://" + host + "/" + dbname;
+            else
+              connectionString = "jdbc:postgresql:" + dbname;
 
-            connection = (PGConnection)driver.connect("jdbc:postgresql://" + host + ":" + port + "/" + dbname, props);
+            System.out.println(connectionString);
+            connection = (PGConnection)driver.connect(connectionString, props);
             jdbcConnection = (java.sql.Connection)connection;
         } catch (SQLException sqle) {
             throw context.runtime.newRuntimeError(sqle.getLocalizedMessage());
         }
         return context.nil;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Properties parse_args(ThreadContext context, IRubyObject[] args) {
+      if (args.length > 7)
+        throw context.getRuntime().newArgumentError("extra positional parameter");
+
+      Properties argumentsHash = new Properties();
+
+      int last_index = 0;
+      // handle a hash argument first
+      if (args.length >= 1 && args[0] instanceof RubyHash) {
+        last_index = 1;
+        RubyHash hash = (RubyHash)args[0];
+
+        for (Object _entry : hash.entrySet()) {
+          Entry<String, Object> entry = (Entry<String, Object>) _entry;
+          argumentsHash.put(PostgresHelpers.stringify(entry.getKey()), PostgresHelpers.stringify(entry.getValue()));
+        }
+      }
+
+      if (args.length == last_index + 1) {
+        // handle a string argument
+        // we have a connection string, parse it
+        String connectionString = args[0].asJavaString();
+        String[] options = connectionString.split(" ");
+        for (String option : options) {
+          String[] keyValuePair = option.split("=");
+          if (keyValuePair.length != 2)
+            throw context.runtime.newRuntimeError("Connection string doesn't have the right format");
+          argumentsHash.put(keyValuePair[0], keyValuePair[1]);
+        }
+      } else if (args.length > last_index + 1) {
+        // assume positional arguments in the following order
+        // host, port, options, tty, dbname, user, password
+        argumentsHash.put("host", args[last_index].asJavaString());
+        if (args.length >= last_index + 1)
+          argumentsHash.put("port", args[last_index + 1].toJava(Integer.class));
+        // FIXME: what is the options argument ?
+        // FIXME: what is the tty argument ?
+        if (args.length >= last_index + 4 && !args[last_index + 4].isNil())
+          argumentsHash.put("dbname", args[last_index + 4].asJavaString());
+        if (args.length >= last_index + 5 && !args[last_index + 5].isNil())
+          argumentsHash.put("user", args[last_index + 5].asJavaString());
+        if (args.length >= last_index + 6 && !args[last_index + 6].isNil())
+          argumentsHash.put("password", args[last_index + 6].asJavaString());
+      }
+      return argumentsHash;
     }
 
     @JRubyMethod
@@ -148,8 +185,26 @@ public class Connection extends RubyObject {
 
     @JRubyMethod(name = {"finish", "close"})
     public IRubyObject finish(ThreadContext context) {
+      try {
+        jdbcConnection.close();
         return context.nil;
+      } catch (SQLException e) {
+        throw context.runtime.newRuntimeError(e.getLocalizedMessage());
+      }
     }
+
+  @JRubyMethod
+  public IRubyObject status(ThreadContext context) {
+    try {
+      if (jdbcConnection.isClosed()) {
+        return context.getConstant("PG::CONNECTION_BAD");
+      } else {
+        return context.getRuntime().getModule("PG").getConstant("CONNECTION_OK");
+      }
+    } catch (SQLException ex) {
+      throw context.getRuntime().newRuntimeError(ex.getMessage());
+    }
+  }
 
     @JRubyMethod(name = "finished?")
     public IRubyObject finished_p(ThreadContext context) {
@@ -214,11 +269,6 @@ public class Connection extends RubyObject {
     }
 
     @JRubyMethod
-    public IRubyObject status(ThreadContext context) {
-        return context.nil;
-    }
-
-    @JRubyMethod
     public IRubyObject transaction_status(ThreadContext context) {
         return context.nil;
     }
@@ -271,10 +321,13 @@ public class Connection extends RubyObject {
         ResultSet set = null;
 
         try {
-            Statement statement = jdbcConnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE);
+            Statement statement = jdbcConnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
             statement.execute(query);
 
             set = statement.getResultSet();
+
+            if (set == null)
+              return context.nil;
         } catch (SQLException sqle) {
             throw context.runtime.newRuntimeError(sqle.getLocalizedMessage());
         }

@@ -158,14 +158,15 @@ public class Result extends RubyObject {
     @JRubyMethod(name = "[]")
     public IRubyObject op_aref(ThreadContext context, IRubyObject arg0) {
         Ruby runtime = context.runtime;
-        int index = (int)arg0.convertToInteger().getLongValue();
+        int index = (int)arg0.convertToInteger().getLongValue() + 1;
 
         try {
-            jdbcResultSet.absolute(index);
+            boolean success = jdbcResultSet.absolute(index);
+            if (!success) return context.nil;
             ResultSetMetaData metaData = jdbcResultSet.getMetaData();
             return currentRowToHash(runtime, metaData, jdbcResultSet);
         } catch (Exception e) {
-            throw context.runtime.newRuntimeError(e.getLocalizedMessage());
+            throw runtime.newRuntimeError(e.getLocalizedMessage());
         }
     }
 
@@ -173,7 +174,7 @@ public class Result extends RubyObject {
         RubyHash hash = RubyHash.newHash(runtime);
 
         for (int i = 1; i <= metaData.getColumnCount(); i++) {
-            hash.put(metaData.getColumnName(i), resultSet.getObject(i));
+            hash.put(metaData.getColumnName(i), resultSet.getObject(i).toString());
         }
 
         return hash;
