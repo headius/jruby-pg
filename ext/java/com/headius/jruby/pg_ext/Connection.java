@@ -11,7 +11,9 @@ import java.util.Map.Entry;
 import java.util.Properties;
 
 import org.jruby.Ruby;
+import org.jruby.RubyArray;
 import org.jruby.RubyClass;
+import org.jruby.RubyEncoding;
 import org.jruby.RubyException;
 import org.jruby.RubyFixnum;
 import org.jruby.RubyHash;
@@ -25,13 +27,20 @@ import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
-import org.postgresql.PGConnection;
+import org.postgresql.core.BaseConnection;
+import org.postgresql.core.Encoding;
 import org.postgresql.largeobject.LargeObject;
 import org.postgresql.largeobject.LargeObjectManager;
+import org.postgresql.util.UnixCrypt;
 
 public class Connection extends RubyObject {
+    protected BaseConnection connection;
+    protected org.jcodings.Encoding encoding;
+
     public Connection(Ruby ruby, RubyClass rubyClass) {
         super(ruby, rubyClass);
+
+        encoding = null;
     }
 
     public static void define(Ruby ruby, RubyModule pg, RubyModule constants) {
@@ -54,9 +63,9 @@ public class Connection extends RubyObject {
         return context.nil;
     }
 
-    @JRubyMethod(meta = true)
-    public static IRubyObject escape_bytea(ThreadContext context, IRubyObject self, IRubyObject arg0) {
-        return context.nil;
+    @JRubyMethod(meta = true, required = 1, argTypes = {RubyArray.class})
+    public static IRubyObject escape_bytea(ThreadContext context, IRubyObject self, IRubyObject array) {
+      return context.nil;
     }
 
     @JRubyMethod(meta = true)
@@ -64,9 +73,13 @@ public class Connection extends RubyObject {
         return context.nil;
     }
 
-    @JRubyMethod(meta = true)
-    public static IRubyObject encrypt_password(ThreadContext context, IRubyObject self, IRubyObject arg0, IRubyObject arg1) {
-        return context.nil;
+    @JRubyMethod(meta = true, required = 2, argTypes = {RubyString.class, RubyString.class})
+    public static IRubyObject encrypt_password(ThreadContext context, IRubyObject self, IRubyObject password, IRubyObject username) {
+      if (username.isNil() || password.isNil())
+        throw context.runtime.newTypeError("usernamd ane password cannot be nil");
+
+      byte[] cryptedPassword = UnixCrypt.crypt(((RubyString) username).getBytes(), ((RubyString) password).getBytes());
+      return context.runtime.newString(new ByteList(cryptedPassword));
     }
 
     @JRubyMethod(meta = true)
@@ -124,8 +137,7 @@ public class Connection extends RubyObject {
             else
               connectionString = "jdbc:postgresql:" + dbname;
 
-            connection = (PGConnection)driver.connect(connectionString, props);
-            jdbcConnection = (java.sql.Connection)connection;
+            connection = (BaseConnection)driver.connect(connectionString, props);
         } catch (SQLException sqle) {
             throw context.runtime.newRuntimeError(sqle.getLocalizedMessage());
         }
@@ -188,7 +200,10 @@ public class Connection extends RubyObject {
     @JRubyMethod(name = {"finish", "close"})
     public IRubyObject finish(ThreadContext context) {
       try {
-        jdbcConnection.close();
+        if (connection.isClosed()) {
+          throw newPgError(context, "The connection is closed");
+        }
+        connection.close();
         return context.nil;
       } catch (SQLException e) {
         throw context.runtime.newRuntimeError(e.getLocalizedMessage());
@@ -198,7 +213,7 @@ public class Connection extends RubyObject {
   @JRubyMethod
   public IRubyObject status(ThreadContext context) {
     try {
-      if (jdbcConnection.isClosed()) {
+      if (connection.isClosed()) {
         return context.getConstant("PG::CONNECTION_BAD");
       } else {
         return context.getRuntime().getModule("PG").getConstant("CONNECTION_OK");
@@ -288,7 +303,7 @@ public class Connection extends RubyObject {
     @JRubyMethod
     public IRubyObject server_version(ThreadContext context) {
       try {
-        DatabaseMetaData metaData = jdbcConnection.getMetaData();
+        DatabaseMetaData metaData = connection.getMetaData();
         int databaseMajorVersion = metaData.getDatabaseMajorVersion();
         int databaseMinorVersion = metaData.getDatabaseMinorVersion();
         return new RubyFixnum(context.runtime, databaseMajorVersion * 100000 + databaseMinorVersion * 1000);
@@ -330,7 +345,7 @@ public class Connection extends RubyObject {
         ResultSet set = null;
 
         try {
-            Statement statement = jdbcConnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
             statement.execute(query);
 
             set = statement.getResultSet();
@@ -341,7 +356,7 @@ public class Connection extends RubyObject {
             throw context.runtime.newRuntimeError(sqle.getLocalizedMessage());
         }
 
-        Result result = new Result(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::Result"), set);
+        Result result = new Result(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::Result"), set, encoding);
         if (block.isGiven())
           return block.call(context, result);
         return result;
@@ -533,14 +548,17 @@ public class Connection extends RubyObject {
 
       try {
         try {
-          jdbcConnection.setAutoCommit(false);
-          block.call(context);
-          jdbcConnection.commit();
+          connection.setAutoCommit(false);
+          if (block.arity().getValue() == 0)
+            block.call(context);
+          else
+            block.call(context, this);
+          connection.commit();
         } catch (RuntimeException ex) {
-          jdbcConnection.rollback();
+          connection.rollback();
           throw ex;
         } finally {
-          jdbcConnection.setAutoCommit(true);
+          connection.setAutoCommit(true);
         }
       } catch (SQLException e) {
         throw context.runtime.newRuntimeError(e.getLocalizedMessage());
@@ -683,17 +701,34 @@ public class Connection extends RubyObject {
 
     @JRubyMethod
     public IRubyObject internal_encoding(ThreadContext context) {
-        return context.nil;
+      return RubyEncoding.newEncoding(context.runtime, encoding);
     }
 
-    @JRubyMethod(name = "internal_encoding=")
-    public IRubyObject internal_encoding_set(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
+    @JRubyMethod(name = "internal_encoding=", required = 1)
+    public IRubyObject internal_encoding_set(ThreadContext context, IRubyObject encoding) {
+      IRubyObject rubyEncoding = context.nil;
+      if (encoding instanceof RubyString) {
+        rubyEncoding = findEncoding(context, encoding);
+      } else if (encoding instanceof RubyEncoding) {
+        rubyEncoding = encoding;
+      }
+
+      if (!rubyEncoding.isNil()) {
+        this.encoding = ((RubyEncoding) rubyEncoding).getEncoding();
+      }
+
+      return rubyEncoding;
     }
 
     @JRubyMethod
     public IRubyObject external_encoding(ThreadContext context) {
-        return context.nil;
+      try {
+        Encoding encoding = connection.getEncoding();
+        IRubyObject rubyEncoding = findEncoding(context, encoding.name());
+        return rubyEncoding;
+      } catch (SQLException e) {
+        throw context.runtime.newRuntimeError(e.getLocalizedMessage());
+      }
     }
 
     @JRubyMethod
@@ -714,6 +749,11 @@ public class Connection extends RubyObject {
       return new RaiseException((RubyException) exception);
     }
 
-    java.sql.Connection jdbcConnection;
-    PGConnection connection;
+    private IRubyObject findEncoding(ThreadContext context, String encodingName) {
+      return findEncoding(context, context.runtime.newString(encodingName));
+    }
+
+    private IRubyObject findEncoding(ThreadContext context, IRubyObject encodingName) {
+      return context.runtime.getClass("Encoding").callMethod("find", encodingName);
+    }
 }

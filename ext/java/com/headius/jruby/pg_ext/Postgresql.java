@@ -14,14 +14,14 @@ import org.postgresql.largeobject.LargeObject;
 import org.postgresql.largeobject.LargeObjectManager;
 
 public class Postgresql implements Library {
-    enum ConnectionStatus {
+    public static enum ConnectionStatus {
       CONNECTION_OK, CONNECTION_BAD;
     };
 
     @Override
     public void load(Ruby ruby, boolean wrap) throws IOException {
         RubyModule pg = ruby.defineModule("PG");
-        RubyClass pgError = ruby.defineClassUnder("Error", ruby.getStandardError(), ruby.getStandardError().getAllocator(), pg);
+        ruby.defineClassUnder("Error", ruby.getStandardError(), ruby.getStandardError().getAllocator(), pg);
         RubyModule pgConstants = ruby.defineModuleUnder("Constants", pg);
 
         // create the connection status constants
@@ -43,10 +43,11 @@ public class Postgresql implements Library {
 
     @JRubyMethod
     public static IRubyObject library_version(ThreadContext context, IRubyObject self) {
-        return context.nil;
+      // FIXME: we should detect the version of the jdbc driver and return it instead
+      return context.runtime.newFixnum(91903);
     }
 
-    @JRubyMethod
+    @JRubyMethod(alias = {"threadsafe?"})
     public static IRubyObject isthreadsafe(ThreadContext context, IRubyObject self) {
         return context.runtime.getTrue();
     }

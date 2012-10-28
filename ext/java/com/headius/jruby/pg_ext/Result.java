@@ -1,26 +1,36 @@
 package com.headius.jruby.pg_ext;
 
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Types;
+
+import org.jcodings.Encoding;
 import org.jruby.Ruby;
+import org.jruby.RubyArray;
 import org.jruby.RubyClass;
+import org.jruby.RubyEncoding;
 import org.jruby.RubyFixnum;
 import org.jruby.RubyHash;
 import org.jruby.RubyModule;
 import org.jruby.RubyObject;
+import org.jruby.RubyString;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
-
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
+import org.jruby.util.ByteList;
 
 public class Result extends RubyObject {
-    public Result(Ruby ruby, RubyClass rubyClass, ResultSet resultSet) {
+    protected final ResultSet jdbcResultSet;
+    protected final Encoding encoding;
+
+    public Result(Ruby ruby, RubyClass rubyClass, ResultSet resultSet, Encoding encoding) {
         super(ruby, rubyClass);
 
         this.jdbcResultSet = resultSet;
+        this.encoding = encoding;
     }
 
     public static void define(Ruby ruby, RubyModule pg, RubyModule constants) {
@@ -176,30 +186,17 @@ public class Result extends RubyObject {
         try {
             boolean success = jdbcResultSet.absolute(index);
             if (!success) return context.nil;
-            ResultSetMetaData metaData = jdbcResultSet.getMetaData();
-            return currentRowToHash(runtime, metaData, jdbcResultSet);
+            return currentRowToHash(context);
         } catch (Exception e) {
             throw runtime.newRuntimeError(e.getLocalizedMessage());
         }
     }
 
-    private static RubyHash currentRowToHash(Ruby runtime, ResultSetMetaData metaData, ResultSet resultSet) throws SQLException {
-        RubyHash hash = RubyHash.newHash(runtime);
-
-        for (int i = 1; i <= metaData.getColumnCount(); i++) {
-            hash.put(metaData.getColumnName(i), resultSet.getObject(i).toString());
-        }
-
-        return hash;
-    }
-
     @JRubyMethod
     public IRubyObject each(ThreadContext context, Block block) {
-        Ruby runtime = context.runtime;
         try {
-            ResultSetMetaData metaData = jdbcResultSet.getMetaData();
             while (jdbcResultSet.next()) {
-                block.yieldSpecific(context, currentRowToHash(runtime, metaData, jdbcResultSet));
+                block.yieldSpecific(context, currentRowToHash(context));
             }
         } catch (Exception e) {
             throw context.runtime.newRuntimeError(e.getLocalizedMessage());
@@ -217,15 +214,81 @@ public class Result extends RubyObject {
         return context.nil;
     }
 
-    @JRubyMethod
-    public IRubyObject column_values(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
+    @JRubyMethod(required = 1, argTypes = {RubyFixnum.class})
+    public IRubyObject column_values(ThreadContext context, IRubyObject index) {
+      if (!(index instanceof RubyFixnum))
+        throw context.runtime.newTypeError("argument must be a FixNum");
+
+      RubyArray array = context.runtime.newArray();
+      int columnIndex = (int) ((RubyFixnum) index).getLongValue() + 1;
+
+      try {
+        jdbcResultSet.first();
+        while (true) {
+          IRubyObject value = getObjectAsString(context, columnIndex);
+          array.append(value);
+          if (!jdbcResultSet.next())
+            break;
+        }
+        return array;
+      } catch (SQLException e) {
+        if (e.getLocalizedMessage().contains("The column index"))
+          throw context.runtime.newIndexError(e.getLocalizedMessage());
+        else
+          throw context.runtime.newRuntimeError(e.getLocalizedMessage());
+      }
     }
 
-    @JRubyMethod
-    public IRubyObject field_values(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
+    @JRubyMethod(required = 1, argTypes = {RubyString.class})
+    public IRubyObject field_values(ThreadContext context, IRubyObject name) {
+      if (!(name instanceof RubyString))
+        throw context.runtime.newTypeError("name must be a string");
+
+      RubyArray array = context.runtime.newArray();
+      String fieldName = ((RubyString) name).asJavaString();
+
+      try {
+        jdbcResultSet.first();
+        while (true) {
+          IRubyObject value = getObjectAsString(context, fieldName);
+          array.append(value);
+          if (!jdbcResultSet.next())
+            break;
+        }
+        return array;
+      } catch (SQLException e) {
+        if (e.getLocalizedMessage().contains("The column name"))
+          throw context.runtime.newIndexError(e.getLocalizedMessage());
+        else
+          throw context.runtime.newRuntimeError(e.getLocalizedMessage());
+      }
     }
 
-    ResultSet jdbcResultSet;
+    private RubyHash currentRowToHash(ThreadContext context) throws SQLException {
+        ResultSetMetaData metaData = jdbcResultSet.getMetaData();
+
+        RubyHash hash = RubyHash.newHash(context.runtime);
+
+        for (int i = 1; i <= metaData.getColumnCount(); i++) {
+            hash.put(metaData.getColumnName(i), getObjectAsString(context, i));
+        }
+
+        return hash;
+    }
+
+    private IRubyObject getObjectAsString(ThreadContext context, int fieldNumber) throws SQLException {
+      RubyString value = context.runtime.newString(jdbcResultSet.getObject(fieldNumber).toString());
+      if (encoding == null)
+        return value;
+
+      return value.encode(context, RubyEncoding.newEncoding(context.runtime, encoding));
+    }
+
+    private IRubyObject getObjectAsString(ThreadContext context, String fieldName) throws SQLException {
+      RubyString value = context.runtime.newString(jdbcResultSet.getObject(fieldName).toString());
+      if (encoding == null)
+        return value;
+
+      return value.encode(context, RubyEncoding.newEncoding(context.runtime, encoding));
+    }
 }
