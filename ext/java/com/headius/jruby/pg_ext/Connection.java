@@ -1,5 +1,7 @@
 package com.headius.jruby.pg_ext;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintWriter;
 import java.sql.DatabaseMetaData;
 import java.sql.Driver;
 import java.sql.DriverManager;
@@ -12,6 +14,7 @@ import java.util.Properties;
 
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
+import org.jruby.RubyBoolean;
 import org.jruby.RubyClass;
 import org.jruby.RubyEncoding;
 import org.jruby.RubyException;
@@ -65,12 +68,12 @@ public class Connection extends RubyObject {
 
     @JRubyMethod(meta = true, required = 1, argTypes = {RubyArray.class})
     public static IRubyObject escape_bytea(ThreadContext context, IRubyObject self, IRubyObject array) {
-      return context.nil;
+      return escapeBytes(context, array);
     }
 
     @JRubyMethod(meta = true)
-    public static IRubyObject unescape_bytea(ThreadContext context, IRubyObject self, IRubyObject arg0) {
-        return context.nil;
+    public static IRubyObject unescape_bytea(ThreadContext context, IRubyObject self, IRubyObject array) {
+      return unescapeBytes(context, array);
     }
 
     @JRubyMethod(meta = true, required = 2, argTypes = {RubyString.class, RubyString.class})
@@ -102,46 +105,61 @@ public class Connection extends RubyObject {
         return context.nil;
     }
 
-    /******     PG::Connection INSTANCE METHODS: Connection Control     ******/
+    public static IRubyObject unescapeBytes (ThreadContext context, IRubyObject _array) {
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
 
-    @JRubyMethod(rest = true, required = 1)
-    public IRubyObject initialize(ThreadContext context, IRubyObject[] args) {
-        String host = null;
-        String dbname = null;
-        Integer port = null;
+      byte[] bytes = ((RubyString) _array).getBytes();
 
-        Properties props = parse_args(context, args);
-        Iterator<Entry<Object, Object>> iterator = props.entrySet().iterator();
-        while (iterator.hasNext()) {
-          Entry<Object, Object> entry = iterator.next();
-          if (entry.getKey().equals("host") || entry.getKey().equals("hostaddr")) {
-            host = (String) entry.getValue();
-            iterator.remove();
-          } else if (entry.getKey().equals("port")) {
-            port = Integer.parseInt((String) entry.getValue());
-            iterator.remove();
-          } else if (entry.getKey().equals("dbname")) {
-            dbname = (String) entry.getValue();
-            iterator.remove();
+      int i = 0;
+      while (i < bytes.length) {
+        byte byteValue = bytes[i];
+        if (byteValue == '\\') {
+          // this is an escape sequence
+          i++;
+          if (bytes[i] == '\\') {
+            out.write('\\');
+          } else {
+            out.write(convertToByte(bytes[i], bytes[i + 1], bytes[i + 2]));
+            i += 2;
           }
+        } else {
+          out.write(byteValue);
         }
+        i++;
+      }
 
-        try {
-            Driver driver = DriverManager.getDriver("jdbc:postgresql");
+      return context.runtime.newString(new ByteList(out.toByteArray()));
+    }
 
-            String connectionString = "";
-            if (host != null && port != null)
-              connectionString = "jdbc:postgresql://" + host + ":" + port + "/" + dbname;
-            else if (host != null)
-              connectionString = "jdbc:postgresql://" + host + "/" + dbname;
-            else
-              connectionString = "jdbc:postgresql:" + dbname;
+    private static IRubyObject escapeBytes(ThreadContext context, IRubyObject _array) {
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      PrintWriter writer = new PrintWriter(out);
 
-            connection = (BaseConnection)driver.connect(connectionString, props);
-        } catch (SQLException sqle) {
-            throw context.runtime.newRuntimeError(sqle.getLocalizedMessage());
+      RubyString array = (RubyString) _array;
+      byte[] bytes = array.getBytes();
+      for (int i = 0; i < bytes.length; i++) {
+        int byteValue= bytes[i] & 0xFF;
+        if (byteValue == 39) {
+          // escape the single quote
+          writer.write("\\\\047");
+        } else if (byteValue == 92) {
+          // escape the backslash
+          writer.write("\\\\134");
+        } else if (byteValue >= 0 && byteValue <= 31 || byteValue >= 127 && byteValue <= 255) {
+          writer.printf("\\\\%03o", byteValue);
+        } else {
+          // all other characters, print as themselves
+          writer.write(byteValue);
         }
-        return context.nil;
+      }
+
+      writer.close();
+      byte[] outBytes = out.toByteArray();
+      return context.runtime.newString(new ByteList(outBytes));
+    }
+
+    private static int convertToByte(int byte1, int byte2, int byte3) {
+      return ((byte1 - '0') * 8 * 8 + (byte2 - '0') * 8 + (byte3 - '0'));
     }
 
     @SuppressWarnings("unchecked")
@@ -190,6 +208,61 @@ public class Connection extends RubyObject {
           argumentsHash.put("password", args[last_index + 6].asJavaString());
       }
       return argumentsHash;
+    }
+
+    private static ObjectAllocator CONNECTION_ALLOCATOR = new ObjectAllocator() {
+        @Override
+        public IRubyObject allocate(Ruby ruby, RubyClass rubyClass) {
+            return new Connection(ruby, rubyClass);
+        }
+    };
+
+    public static RaiseException newPgError(ThreadContext context, String message) {
+      RubyClass klass = context.runtime.getModule("PG").getClass("Error");
+      IRubyObject exception = klass.newInstance(context, context.runtime.newString(message), null);
+      return new RaiseException((RubyException) exception);
+    }
+
+    /******     PG::Connection INSTANCE METHODS: Connection Control     ******/
+
+    @JRubyMethod(rest = true, required = 1)
+    public IRubyObject initialize(ThreadContext context, IRubyObject[] args) {
+        String host = null;
+        String dbname = null;
+        Integer port = null;
+
+        Properties props = parse_args(context, args);
+        Iterator<Entry<Object, Object>> iterator = props.entrySet().iterator();
+        while (iterator.hasNext()) {
+          Entry<Object, Object> entry = iterator.next();
+          if (entry.getKey().equals("host") || entry.getKey().equals("hostaddr")) {
+            host = (String) entry.getValue();
+            iterator.remove();
+          } else if (entry.getKey().equals("port")) {
+            port = Integer.parseInt((String) entry.getValue());
+            iterator.remove();
+          } else if (entry.getKey().equals("dbname")) {
+            dbname = (String) entry.getValue();
+            iterator.remove();
+          }
+        }
+
+        try {
+            Driver driver = DriverManager.getDriver("jdbc:postgresql");
+
+            String connectionString = "";
+            if (host != null && port != null)
+              connectionString = "jdbc:postgresql://" + host + ":" + port + "/" + dbname;
+            else if (host != null)
+              connectionString = "jdbc:postgresql://" + host + "/" + dbname;
+            else
+              connectionString = "jdbc:postgresql:" + dbname;
+
+            connection = (BaseConnection)driver.connect(connectionString, props);
+        } catch (SQLException sqle) {
+            throw context.runtime.newRuntimeError(sqle.getLocalizedMessage());
+        }
+        return context.nil;
     }
 
     @JRubyMethod
@@ -356,7 +429,11 @@ public class Connection extends RubyObject {
             throw context.runtime.newRuntimeError(sqle.getLocalizedMessage());
         }
 
-        Result result = new Result(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::Result"), set, encoding);
+        boolean binary = false;
+        if (args.length == 3)
+          binary = ((RubyFixnum) args[2]).getLongValue() == 1;
+
+        Result result = new Result(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::Result"), set, encoding, binary);
         if (block.isGiven())
           return block.call(context, result);
         return result;
@@ -403,13 +480,13 @@ public class Connection extends RubyObject {
     }
 
     @JRubyMethod
-    public IRubyObject escape_bytea(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
+    public IRubyObject escape_bytea(ThreadContext context, IRubyObject array) {
+      return escapeBytes(context, array);
     }
 
     @JRubyMethod
-    public IRubyObject unescape_bytea(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
+    public IRubyObject unescape_bytea(ThreadContext context, IRubyObject array) {
+      return unescapeBytes(context, array);
     }
 
     /******     PG::Connection INSTANCE METHODS: Asynchronous Command Processing     ******/
@@ -734,19 +811,6 @@ public class Connection extends RubyObject {
     @JRubyMethod
     public IRubyObject set_default_encoding(ThreadContext context, IRubyObject arg0) {
         return context.nil;
-    }
-
-    private static ObjectAllocator CONNECTION_ALLOCATOR = new ObjectAllocator() {
-        @Override
-        public IRubyObject allocate(Ruby ruby, RubyClass rubyClass) {
-            return new Connection(ruby, rubyClass);
-        }
-    };
-
-    private RaiseException newPgError(ThreadContext context, String message) {
-      RubyClass klass = context.runtime.getModule("PG").getClass("Error");
-      IRubyObject exception = klass.newInstance(context, context.runtime.newString(message), null);
-      return new RaiseException((RubyException) exception);
     }
 
     private IRubyObject findEncoding(ThreadContext context, String encodingName) {
