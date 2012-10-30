@@ -144,10 +144,8 @@ public class Result extends RubyObject {
       int column = (int) ((RubyFixnum) _column).getLongValue() + 1;
 
       try {
-        int oldRow = jdbcResultSet.getRow();
         jdbcResultSet.absolute(row);
         IRubyObject value = getObjectAsString(context, column);
-        jdbcResultSet.absolute(oldRow);
         return value;
       } catch (SQLException e) {
         throw Connection.newPgError(context, e.getLocalizedMessage());
@@ -331,7 +329,7 @@ public class Result extends RubyObject {
     private IRubyObject getObjectAsString(ThreadContext context, String fieldName) throws SQLException {
       ResultSetMetaData metaData = jdbcResultSet.getMetaData();
       int columns = metaData.getColumnCount();
-      for (int i = 0; i < columns; i++)
+      for (int i = 1; i <= columns; i++)
         if (metaData.getColumnName(i).equals(fieldName))
           return getObjectAsString(context, i);
       return context.nil;
