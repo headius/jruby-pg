@@ -217,9 +217,14 @@ public class Connection extends RubyObject {
         }
     };
 
-    public static RaiseException newPgError(ThreadContext context, String message) {
+    public static RaiseException newPgError(ThreadContext context, String message, org.jcodings.Encoding encoding) {
       RubyClass klass = context.runtime.getModule("PG").getClass("Error");
-      IRubyObject exception = klass.newInstance(context, context.runtime.newString(message), null);
+      RubyString rubyMessage = context.runtime.newString(message);
+      if (encoding != null) {
+        RubyEncoding rubyEncoding = RubyEncoding.newEncoding(context.runtime, encoding);
+        rubyMessage = (RubyString) rubyMessage.encode(context, rubyEncoding);
+      }
+      IRubyObject exception = klass.newInstance(context, rubyMessage, null);
       return new RaiseException((RubyException) exception);
     }
 
@@ -274,7 +279,7 @@ public class Connection extends RubyObject {
     public IRubyObject finish(ThreadContext context) {
       try {
         if (connection.isClosed()) {
-          throw newPgError(context, "The connection is closed");
+          throw newPgError(context, "The connection is closed", encoding);
         }
         connection.close();
         return context.nil;
@@ -426,7 +431,7 @@ public class Connection extends RubyObject {
             if (set == null)
               return context.nil;
         } catch (SQLException sqle) {
-            throw context.runtime.newRuntimeError(sqle.getLocalizedMessage());
+            throw newPgError(context, sqle.getLocalizedMessage(), encoding);
         }
 
         boolean binary = false;
@@ -610,12 +615,16 @@ public class Connection extends RubyObject {
 
     @JRubyMethod
     public IRubyObject get_client_encoding(ThreadContext context) {
-        return context.nil;
+      return RubyEncoding.newEncoding(context.runtime, encoding);
     }
 
-    @JRubyMethod(name = {"set_client_encoding", "client_encoding="})
-    public IRubyObject set_client_encoding(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
+    @JRubyMethod(name = {"set_client_encoding", "client_encoding="}, argTypes = {RubyString.class})
+    public IRubyObject set_client_encoding(ThreadContext context, IRubyObject encodingName) {
+      RubyEncoding rubyEncoding = (RubyEncoding) findEncoding(context, encodingName);
+      if (!rubyEncoding.isNil()) {
+        encoding = rubyEncoding.getEncoding();
+      }
+      return rubyEncoding;
     }
 
     @JRubyMethod()
@@ -681,7 +690,7 @@ public class Connection extends RubyObject {
           oid = manager.createLO();
         return new RubyFixnum(context.runtime, oid);
       } catch (SQLException e) {
-        throw newPgError(context, "lo_create failed");
+        throw newPgError(context, "lo_create failed", encoding);
       }
     }
 
@@ -712,7 +721,7 @@ public class Connection extends RubyObject {
 
         return new LargeObjectFd(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::LargeObjectFd"), object);
       } catch (SQLException e) {
-        throw newPgError(context, e.getLocalizedMessage());
+        throw newPgError(context, e.getLocalizedMessage(), encoding);
       }
     }
 
@@ -724,7 +733,7 @@ public class Connection extends RubyObject {
         largeObject.write(bufferString.getBytes());
         return bufferString.length();
       } catch (SQLException e) {
-        throw newPgError(context, e.getLocalizedMessage());
+        throw newPgError(context, e.getLocalizedMessage(), encoding);
       }
     }
 
@@ -737,7 +746,7 @@ public class Connection extends RubyObject {
           return context.nil;
         return context.runtime.newString(new ByteList(b));
       } catch (SQLException e) {
-        throw newPgError(context, e.getLocalizedMessage());
+        throw newPgError(context, e.getLocalizedMessage(), encoding);
       }
     }
 
@@ -750,7 +759,7 @@ public class Connection extends RubyObject {
             (int) ((RubyFixnum) whence).getLongValue());
         return new RubyFixnum(context.runtime, largeObject.tell());
       } catch (SQLException e) {
-        throw newPgError(context, e.getLocalizedMessage());
+        throw newPgError(context, e.getLocalizedMessage(), encoding);
       }
     }
 

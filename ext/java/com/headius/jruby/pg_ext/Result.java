@@ -148,7 +148,7 @@ public class Result extends RubyObject {
         IRubyObject value = getObjectAsString(context, column);
         return value;
       } catch (SQLException e) {
-        throw Connection.newPgError(context, e.getLocalizedMessage());
+        throw Connection.newPgError(context, e.getLocalizedMessage(), encoding);
       }
     }
 
@@ -202,7 +202,7 @@ public class Result extends RubyObject {
 
         return array;
       } catch (SQLException e) {
-        throw Connection.newPgError(context, e.getLocalizedMessage());
+        throw Connection.newPgError(context, e.getLocalizedMessage(), encoding);
       }
     }
 
