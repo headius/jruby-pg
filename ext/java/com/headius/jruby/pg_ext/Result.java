@@ -332,6 +332,6 @@ public class Result extends RubyObject {
       for (int i = 1; i <= columns; i++)
         if (metaData.getColumnName(i).equals(fieldName))
           return getObjectAsString(context, i);
-      return context.nil;
+      throw context.runtime.newIndexError("Invalid field name");
     }
 }
