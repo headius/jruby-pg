@@ -263,6 +263,9 @@ public class Connection extends RubyObject {
             else
               connectionString = "jdbc:postgresql:" + dbname;
 
+            // enable change in client encoding by issuing 'set client_encoding = foo' command
+            props.setProperty("allowEncodingChanges", "true");
+
             connection = (BaseConnection)driver.connect(connectionString, props);
         } catch (SQLException sqle) {
             throw context.runtime.newRuntimeError(sqle.getLocalizedMessage());
