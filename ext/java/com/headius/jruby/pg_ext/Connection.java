@@ -790,6 +790,8 @@ public class Connection extends RubyObject {
 
     @JRubyMethod
     public IRubyObject internal_encoding(ThreadContext context) {
+      if (encoding == null)
+        return context.nil;
       return RubyEncoding.newEncoding(context.runtime, encoding);
     }
 
