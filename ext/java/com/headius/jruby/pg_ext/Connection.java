@@ -8,9 +8,13 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
@@ -39,6 +43,54 @@ import org.postgresql.util.UnixCrypt;
 public class Connection extends RubyObject {
     protected BaseConnection connection;
     protected org.jcodings.Encoding encoding;
+    protected IRubyObject rubyEncoding;
+
+    private final static Pattern ENCODING_PATTERN = Pattern.compile("(?i).*set\\s+client_encoding\\s+(?:TO|=)\\s+'?(\\S+)'?.*");
+    private final static Map<String, String> postgresEncodingToRubyEncoding = new HashMap<String, String>();
+
+    static {
+      postgresEncodingToRubyEncoding.put("BIG5",          "Big5"        );
+      postgresEncodingToRubyEncoding.put("EUC_CN",        "GB2312"      );
+      postgresEncodingToRubyEncoding.put("EUC_JP",        "EUC-JP"      );
+      postgresEncodingToRubyEncoding.put("EUC_JIS_2004",  "EUC-JP"      );
+      postgresEncodingToRubyEncoding.put("EUC_KR",        "EUC-KR"      );
+      postgresEncodingToRubyEncoding.put("EUC_TW",        "EUC-TW"      );
+      postgresEncodingToRubyEncoding.put("GB18030",       "GB18030"     );
+      postgresEncodingToRubyEncoding.put("GBK",           "GBK"         );
+      postgresEncodingToRubyEncoding.put("ISO_8859_5",    "ISO-8859-5"  );
+      postgresEncodingToRubyEncoding.put("ISO_8859_6",    "ISO-8859-6"  );
+      postgresEncodingToRubyEncoding.put("ISO_8859_7",    "ISO-8859-7"  );
+      postgresEncodingToRubyEncoding.put("ISO_8859_8",    "ISO-8859-8"  );
+      postgresEncodingToRubyEncoding.put("KOI8",          "KOI8-R"      );
+      postgresEncodingToRubyEncoding.put("KOI8R",         "KOI8-R"      );
+      postgresEncodingToRubyEncoding.put("KOI8U",         "KOI8-U"      );
+      postgresEncodingToRubyEncoding.put("LATIN1",        "ISO-8859-1"  );
+      postgresEncodingToRubyEncoding.put("LATIN2",        "ISO-8859-2"  );
+      postgresEncodingToRubyEncoding.put("LATIN3",        "ISO-8859-3"  );
+      postgresEncodingToRubyEncoding.put("LATIN4",        "ISO-8859-4"  );
+      postgresEncodingToRubyEncoding.put("LATIN5",        "ISO-8859-9"  );
+      postgresEncodingToRubyEncoding.put("LATIN6",        "ISO-8859-10" );
+      postgresEncodingToRubyEncoding.put("LATIN7",        "ISO-8859-13" );
+      postgresEncodingToRubyEncoding.put("LATIN8",        "ISO-8859-14" );
+      postgresEncodingToRubyEncoding.put("LATIN9",        "ISO-8859-15" );
+      postgresEncodingToRubyEncoding.put("LATIN10",       "ISO-8859-16" );
+      postgresEncodingToRubyEncoding.put("MULE_INTERNAL", "Emacs-Mule"  );
+      postgresEncodingToRubyEncoding.put("SJIS",          "Windows-31J" );
+      postgresEncodingToRubyEncoding.put("SHIFT_JIS_2004","Windows-31J" );
+      postgresEncodingToRubyEncoding.put("UHC",           "CP949"       );
+      postgresEncodingToRubyEncoding.put("UTF8",          "UTF-8"       );
+      postgresEncodingToRubyEncoding.put("WIN866",        "IBM866"      );
+      postgresEncodingToRubyEncoding.put("WIN874",        "Windows-874" );
+      postgresEncodingToRubyEncoding.put("WIN1250",       "Windows-1250");
+      postgresEncodingToRubyEncoding.put("WIN1251",       "Windows-1251");
+      postgresEncodingToRubyEncoding.put("WIN1252",       "Windows-1252");
+      postgresEncodingToRubyEncoding.put("WIN1253",       "Windows-1253");
+      postgresEncodingToRubyEncoding.put("WIN1254",       "Windows-1254");
+      postgresEncodingToRubyEncoding.put("WIN1255",       "Windows-1255");
+      postgresEncodingToRubyEncoding.put("WIN1256",       "Windows-1256");
+      postgresEncodingToRubyEncoding.put("WIN1257",       "Windows-1257");
+      postgresEncodingToRubyEncoding.put("WIN1258",       "Windows-1258");
+    }
 
     public Connection(Ruby ruby, RubyClass rubyClass) {
         super(ruby, rubyClass);
@@ -61,14 +113,14 @@ public class Connection extends RubyObject {
 
     /******     PG::Connection CLASS METHODS     ******/
 
-    @JRubyMethod(name = {"escape, escape_string"}, meta = true)
-    public static IRubyObject escape_string(ThreadContext context, IRubyObject self, IRubyObject arg0) {
+    @JRubyMethod(alias = {"escape, escape_string"}, meta = true)
+    public static IRubyObject escape_literal_native(ThreadContext context, IRubyObject self, IRubyObject arg0) {
         return context.nil;
     }
 
     @JRubyMethod(meta = true, required = 1, argTypes = {RubyArray.class})
     public static IRubyObject escape_bytea(ThreadContext context, IRubyObject self, IRubyObject array) {
-      return escapeBytes(context, array);
+      return escapeBytes(context, array, context.nil);
     }
 
     @JRubyMethod(meta = true)
@@ -131,13 +183,25 @@ public class Connection extends RubyObject {
       return context.runtime.newString(new ByteList(out.toByteArray()));
     }
 
-    private static IRubyObject escapeBytes(ThreadContext context, IRubyObject _array) {
-      ByteArrayOutputStream out = new ByteArrayOutputStream();
-      PrintWriter writer = new PrintWriter(out);
-
+    private static IRubyObject escapeBytes(ThreadContext context, IRubyObject _array, IRubyObject encoding) {
       RubyString array = (RubyString) _array;
       byte[] bytes = array.getBytes();
-      for (int i = 0; i < bytes.length; i++) {
+
+      return escapeBytes(context, bytes, encoding);
+    }
+
+    private static IRubyObject escapeBytes(ThreadContext context, byte[] bytes, IRubyObject encoding) {
+      return escapeBytes(context, bytes, 0, bytes.length, encoding);
+    }
+
+    private static IRubyObject escapeBytes(ThreadContext context, byte[] bytes, int offset, int len, IRubyObject encoding) {
+      if (len < 0 || offset < 0 || offset + len > bytes.length) {
+        throw context.runtime.newArgumentError("Oops array offset or length isn't correct");
+      }
+
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      PrintWriter writer = new PrintWriter(out);
+      for (int i = offset; i < (offset + len); i++) {
         int byteValue= bytes[i] & 0xFF;
         if (byteValue == 39) {
           // escape the single quote
@@ -155,7 +219,9 @@ public class Connection extends RubyObject {
 
       writer.close();
       byte[] outBytes = out.toByteArray();
-      return context.runtime.newString(new ByteList(outBytes));
+      if (encoding.isNil())
+        return context.runtime.newString(new ByteList(outBytes));
+      return context.runtime.newString(new ByteList(outBytes, ((RubyEncoding) encoding).getEncoding()));
     }
 
     private static int convertToByte(int byte1, int byte2, int byte3) {
@@ -232,6 +298,8 @@ public class Connection extends RubyObject {
 
     @JRubyMethod(rest = true, required = 1)
     public IRubyObject initialize(ThreadContext context, IRubyObject[] args) {
+        this.rubyEncoding = context.nil;
+
         String host = null;
         String dbname = null;
         Integer port = null;
@@ -267,6 +335,9 @@ public class Connection extends RubyObject {
             props.setProperty("allowEncodingChanges", "true");
 
             connection = (BaseConnection)driver.connect(connectionString, props);
+
+            // set the encoding if the default internal_encoding is set
+            set_default_encoding(context);
         } catch (SQLException sqle) {
             throw context.runtime.newRuntimeError(sqle.getLocalizedMessage());
         }
@@ -424,12 +495,16 @@ public class Connection extends RubyObject {
     public IRubyObject exec(ThreadContext context, IRubyObject[] args, Block block) {
         String query = args[0].convertToString().toString();
         ResultSet set = null;
-
         try {
             Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
             statement.execute(query);
 
             set = statement.getResultSet();
+
+            Matcher matcher = ENCODING_PATTERN.matcher(query);
+            if (matcher.matches()) {
+              internal_encoding_set(context, context.runtime.newString(matcher.group(1)));
+            }
 
             if (set == null)
               return context.nil;
@@ -472,14 +547,13 @@ public class Connection extends RubyObject {
         return context.nil;
     }
 
-    @JRubyMethod(name = {"escape_string", "escape"})
-    public IRubyObject escape_string(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
-    }
-
-    @JRubyMethod
-    public IRubyObject escape_literal(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
+    @JRubyMethod(alias = {"escape_string", "escape"}, required = 1, argTypes = {RubyString.class} )
+    public IRubyObject escape_literal_native(ThreadContext context, IRubyObject _str) {
+      RubyString str = (RubyString) _str;
+      byte[] bytes = str.getBytes();
+      int i;
+      for (i = 0; i < bytes.length && bytes[i] != '\0'; i++);
+      return escapeBytes(context, bytes, 0, i, rubyEncoding);
     }
 
     @JRubyMethod
@@ -489,7 +563,7 @@ public class Connection extends RubyObject {
 
     @JRubyMethod
     public IRubyObject escape_bytea(ThreadContext context, IRubyObject array) {
-      return escapeBytes(context, array);
+      return escapeBytes(context, array, rubyEncoding);
     }
 
     @JRubyMethod
@@ -615,20 +689,6 @@ public class Connection extends RubyObject {
     }
 
     /******     PG::Connection INSTANCE METHODS: Other    ******/
-
-    @JRubyMethod
-    public IRubyObject get_client_encoding(ThreadContext context) {
-      return RubyEncoding.newEncoding(context.runtime, encoding);
-    }
-
-    @JRubyMethod(name = {"set_client_encoding", "client_encoding="}, argTypes = {RubyString.class})
-    public IRubyObject set_client_encoding(ThreadContext context, IRubyObject encodingName) {
-      RubyEncoding rubyEncoding = (RubyEncoding) findEncoding(context, encodingName);
-      if (!rubyEncoding.isNil()) {
-        encoding = rubyEncoding.getEncoding();
-      }
-      return rubyEncoding;
-    }
 
     @JRubyMethod()
     public IRubyObject transaction(ThreadContext context, Block block) {
@@ -788,14 +848,12 @@ public class Connection extends RubyObject {
 
     /******     M17N     ******/
 
-    @JRubyMethod
+    @JRubyMethod(alias = {"client_encoding"})
     public IRubyObject internal_encoding(ThreadContext context) {
-      if (encoding == null)
-        return context.nil;
-      return RubyEncoding.newEncoding(context.runtime, encoding);
+      return rubyEncoding;
     }
 
-    @JRubyMethod(name = "internal_encoding=", required = 1)
+    @JRubyMethod(name = {"internal_encoding=", "set_client_encoding", "client_encoding=" }, required = 1)
     public IRubyObject internal_encoding_set(ThreadContext context, IRubyObject encoding) {
       IRubyObject rubyEncoding = context.nil;
       if (encoding instanceof RubyString) {
@@ -806,6 +864,7 @@ public class Connection extends RubyObject {
 
       if (!rubyEncoding.isNil()) {
         this.encoding = ((RubyEncoding) rubyEncoding).getEncoding();
+        this.rubyEncoding = rubyEncoding;
       }
 
       return rubyEncoding;
@@ -823,8 +882,12 @@ public class Connection extends RubyObject {
     }
 
     @JRubyMethod
-    public IRubyObject set_default_encoding(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
+    public IRubyObject set_default_encoding(ThreadContext context) {
+      IRubyObject internal_encoding = RubyEncoding.getDefaultInternal(this);
+      if (!internal_encoding.isNil()) {
+        return internal_encoding_set(context, internal_encoding);
+      }
+      return internal_encoding;
     }
 
     private IRubyObject findEncoding(ThreadContext context, String encodingName) {
@@ -832,6 +895,15 @@ public class Connection extends RubyObject {
     }
 
     private IRubyObject findEncoding(ThreadContext context, IRubyObject encodingName) {
-      return context.runtime.getClass("Encoding").callMethod("find", encodingName);
+      try {
+        String javaName = encodingName.asJavaString().toUpperCase();
+        if (postgresEncodingToRubyEncoding.containsKey(javaName)) {
+          String rubyName = postgresEncodingToRubyEncoding.get(javaName);
+          return findEncoding(context, rubyName);
+        }
+        return context.runtime.getClass("Encoding").callMethod("find", encodingName);
+      } catch (RuntimeException e) {
+        return context.runtime.getClass("Encoding").getConstant("ASCII_8BIT");
+      }
     }
 }
