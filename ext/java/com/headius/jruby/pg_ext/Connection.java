@@ -18,7 +18,6 @@ import java.util.regex.Pattern;
 
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
-import org.jruby.RubyBoolean;
 import org.jruby.RubyClass;
 import org.jruby.RubyEncoding;
 import org.jruby.RubyException;
@@ -335,7 +334,6 @@ public class Connection extends RubyObject {
             props.setProperty("allowEncodingChanges", "true");
 
             connection = (BaseConnection)driver.connect(connectionString, props);
-
             // set the encoding if the default internal_encoding is set
             set_default_encoding(context);
         } catch (SQLException sqle) {
