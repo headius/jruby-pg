@@ -312,14 +312,25 @@ public class Result extends RubyObject {
       switch (jdbcResultSet.getMetaData().getColumnType(fieldNumber)) {
       case Types.BINARY:
       case Types.BLOB:
-        RubyString string = context.runtime.newString(new ByteList(jdbcResultSet.getBytes(fieldNumber)));
-        if (!binary)
-          return string;
-        return Connection.unescapeBytes(context, string);
+        byte[] bytes = jdbcResultSet.getBytes(fieldNumber);
+        RubyString string;
+        if (bytes != null) {
+          string = context.runtime.newString(new ByteList(bytes));
+          if (binary)
+            return string;
+          return Connection.unescapeBytes(context, string);
+        }
+        // fall through if this column is null
       case Types.NULL:
         return context.nil;
+      default:
+        break;
       }
-      RubyString value = context.runtime.newString(jdbcResultSet.getObject(fieldNumber).toString());
+      Object object = jdbcResultSet.getObject(fieldNumber);
+      if (object == null) {
+        return context.nil;
+      }
+      RubyString value = context.runtime.newString(object.toString());
       if (encoding == null)
         return value;
 

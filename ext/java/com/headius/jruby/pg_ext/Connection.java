@@ -5,11 +5,15 @@ import java.io.PrintWriter;
 import java.sql.DatabaseMetaData;
 import java.sql.Driver;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
@@ -26,6 +30,7 @@ import org.jruby.RubyHash;
 import org.jruby.RubyModule;
 import org.jruby.RubyObject;
 import org.jruby.RubyString;
+import org.jruby.RubySymbol;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.Block;
@@ -35,6 +40,8 @@ import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
 import org.postgresql.core.BaseConnection;
 import org.postgresql.core.Encoding;
+import org.postgresql.core.Oid;
+import org.postgresql.jdbc3.AbstractJdbc3Statement;
 import org.postgresql.largeobject.LargeObject;
 import org.postgresql.largeobject.LargeObjectManager;
 import org.postgresql.util.UnixCrypt;
@@ -45,6 +52,7 @@ public class Connection extends RubyObject {
     protected IRubyObject rubyEncoding;
 
     private final static Pattern ENCODING_PATTERN = Pattern.compile("(?i).*set\\s+client_encoding\\s+(?:TO|=)\\s+'?(\\S+)'?.*");
+    private final static Pattern PARAMS_PATTERN = Pattern.compile("(?:[^\\$]*(?:\\$(\\d+))[^\\$]*)");
     private final static Map<String, String> postgresEncodingToRubyEncoding = new HashMap<String, String>();
 
     static {
@@ -494,10 +502,48 @@ public class Connection extends RubyObject {
         String query = args[0].convertToString().toString();
         ResultSet set = null;
         try {
-            Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-            statement.execute(query);
 
-            set = statement.getResultSet();
+            if (args.length == 1) {
+              Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+              statement.execute(query);
+              set = statement.getResultSet();
+            } else {
+              // change the parameters from $1 to ? and keep track of where each parameter is used
+              Map<Integer, List<Integer> > indexToQueryParameter = new HashMap<Integer, List<Integer>>();
+              query = fixQueryParametersSyntax(query, indexToQueryParameter);
+              PreparedStatement statement = connection.prepareStatement(query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+              RubyArray params = (RubyArray) args[1];
+              for (int i = 1; i <= params.getLength(); i++) {
+                IRubyObject param = (IRubyObject) params.get(i - 1);
+
+                List<Integer> list = indexToQueryParameter.get(i);
+
+                for (int columnIndex : list) {
+                  if (param == null || param.isNil()) {
+                    statement.setNull(columnIndex, Types.OTHER);
+                  } else if (param instanceof RubyString) {
+                    statement.setString(columnIndex, ((RubyString) param).asJavaString());
+                  } else if (param instanceof RubyHash) {
+                    RubyHash hash = (RubyHash) param;
+
+                    RubySymbol value_s = context.runtime.newSymbol("value");
+                    RubySymbol format_s = context.runtime.newSymbol("format");
+
+                    RubyString value = (RubyString) hash.op_aref(context, value_s);
+                    RubyFixnum format = (RubyFixnum) hash.op_aref(context, format_s);
+
+                    if (format.getLongValue() == 0) {
+                      statement.setString(columnIndex, value.asJavaString());
+                    } else if (format.getLongValue() == 1) {
+                      statement.setBytes(columnIndex, value.getBytes());
+                    }
+                  } else {
+                    throw context.runtime.newArgumentError("parameters must be a string or hash");
+                  }
+                }
+                set = statement.executeQuery();
+              }
+            }
 
             Matcher matcher = ENCODING_PATTERN.matcher(query);
             if (matcher.matches()) {
@@ -518,6 +564,25 @@ public class Connection extends RubyObject {
         if (block.isGiven())
           return block.call(context, result);
         return result;
+    }
+
+    // FIXME: the following method undo what the jdbc driver does; the driver expect "?" for query parameters
+    // and convert it to "$i" (where i is some integer). we have to convert "$i" to "?" for the driver to convert
+    // it back which is annoying
+    private String fixQueryParametersSyntax(String query, Map<Integer, List<Integer>> indexToQueryParameter) {
+      Matcher matcher = PARAMS_PATTERN.matcher(query);
+      if (!matcher.matches())
+        return query;
+      for (int i = 1; i <= matcher.groupCount(); i++) {
+        int index = Integer.parseInt(matcher.group(i));
+        List<Integer> list = indexToQueryParameter.get(index);
+        if (list == null) {
+          list = new ArrayList<Integer>();
+          indexToQueryParameter.put(index, list);
+        }
+        list.add(i);
+      }
+      return query.replaceAll("\\$\\d+", "?");
     }
 
     @JRubyMethod(rest = true)
