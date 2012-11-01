@@ -541,8 +541,8 @@ public class Connection extends RubyObject {
                     throw context.runtime.newArgumentError("parameters must be a string or hash");
                   }
                 }
-                set = statement.executeQuery();
               }
+              set = statement.executeQuery();
             }
 
             Matcher matcher = ENCODING_PATTERN.matcher(query);
