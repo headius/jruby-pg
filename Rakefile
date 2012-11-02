@@ -61,7 +61,10 @@ task 'get-ruby-pg-specs' do
   end
 end
 
-Rake::Task[:spec].prerequisites << 'get-ruby-pg-specs'
+desc "make sure the spec directory has the latest ruby-pg and jruby-pg specs"
+task :'sync-files' => 'get-ruby-pg-specs'
+
+Rake::Task[:spec].prerequisites << 'sync-files'
 Rake::Task[:spec].prerequisites << :compile
 
 # sync specs from jruby-spec to spec/jruby
@@ -73,8 +76,7 @@ Dir.glob('jruby-spec/*.rb').each do |f|
   t = file new_name => [f] do |t|
     FileUtils.cp f, new_name
   end
-  Rake::Task[:spec].prerequisites << t
-  puts "created task for file #{basename}, task: #{t}, f: #{f}"
+  Rake::Task[:'sync-files'].prerequisites << t
 end
 
 # vim: syntax=ruby

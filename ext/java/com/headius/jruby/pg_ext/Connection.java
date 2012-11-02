@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -39,23 +40,27 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
 import org.postgresql.core.BaseConnection;
+import org.postgresql.core.BaseStatement;
 import org.postgresql.core.Encoding;
+import org.postgresql.core.Field;
 import org.postgresql.largeobject.LargeObject;
 import org.postgresql.largeobject.LargeObjectManager;
 import org.postgresql.util.UnixCrypt;
 
 public class Connection extends RubyObject {
-    protected static Connection LAST_CONNECTION = null;
-    protected BaseConnection connection;
-    protected org.jcodings.Encoding encoding;
-    protected IRubyObject rubyEncoding;
-
     private final static Pattern ENCODING_PATTERN = Pattern.compile("(?i).*set\\s+client_encoding\\s+(?:TO|=)\\s+'?(\\S+)'?.*");
     private final static Pattern PARAMS_PATTERN = Pattern.compile("(?:[^\\$]*(?:\\$(\\d+))[^\\$]*)");
     private final static Map<String, String> postgresEncodingToRubyEncoding = new HashMap<String, String>();
+    protected final static int FORMAT_TEXT = 0;
+    protected final static int FORMAT_BINARY = 1;
 
-    final static int FORMAT_TEXT = 0;
-    final static int FORMAT_BINARY = 1;
+    protected static Connection LAST_CONNECTION = null;
+    protected static Result EMPTY_RESULT;
+
+    protected BaseConnection connection;
+    protected org.jcodings.Encoding encoding;
+    protected IRubyObject rubyEncoding;
+    protected Map<String, com.headius.jruby.pg_ext.PgPreparedStatement> preparedQueries = new HashMap<String, com.headius.jruby.pg_ext.PgPreparedStatement>();
 
     static {
       postgresEncodingToRubyEncoding.put("BIG5",          "Big5"        );
@@ -225,10 +230,6 @@ public class Connection extends RubyObject {
       return context.runtime.newString(new ByteList(outBytes, ((RubyEncoding) encoding).getEncoding()));
     }
 
-    private static int convertToByte(int byte1, int byte2, int byte3) {
-      return ((byte1 - '0') * 8 * 8 + (byte2 - '0') * 8 + (byte3 - '0'));
-    }
-
     @SuppressWarnings("unchecked")
     private static Properties parse_args(ThreadContext context, IRubyObject[] args) {
       if (args.length > 7)
@@ -293,6 +294,19 @@ public class Connection extends RubyObject {
       }
       IRubyObject exception = klass.newInstance(context, rubyMessage, null);
       return new RaiseException((RubyException) exception);
+    }
+
+    private IRubyObject get_empty_result(ThreadContext context) {
+      try {
+        if (EMPTY_RESULT == null) {
+          BaseStatement st = ((BaseStatement) connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY));
+          ResultSet set = st.createDriverResultSet(new Field[0], new Vector());
+          EMPTY_RESULT = new Result(context.runtime, (RubyClass) context.runtime.getClassFromPath("PG::Result"), set, null, false);
+        }
+        return EMPTY_RESULT;
+      } catch (SQLException e) {
+        throw context.runtime.newRuntimeError(e.getLocalizedMessage());
+      }
     }
 
     /******     PG::Connection INSTANCE METHODS: Connection Control     ******/
@@ -507,37 +521,8 @@ public class Connection extends RubyObject {
               Map<Integer, List<Integer> > indexToQueryParameter = new HashMap<Integer, List<Integer>>();
               query = fixQueryParametersSyntax(query, indexToQueryParameter);
               PreparedStatement statement = connection.prepareStatement(query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-              RubyArray params = (RubyArray) args[1];
-              for (int i = 1; i <= params.getLength(); i++) {
-                IRubyObject param = (IRubyObject) params.get(i - 1);
-
-                List<Integer> list = indexToQueryParameter.get(i);
-
-                for (int columnIndex : list) {
-                  if (param == null || param.isNil()) {
-                    statement.setNull(columnIndex, Types.OTHER);
-                  } else if (param instanceof RubyString) {
-                    statement.setString(columnIndex, ((RubyString) param).asJavaString());
-                  } else if (param instanceof RubyHash) {
-                    RubyHash hash = (RubyHash) param;
-
-                    RubySymbol value_s = context.runtime.newSymbol("value");
-                    RubySymbol format_s = context.runtime.newSymbol("format");
-
-                    RubyString value = (RubyString) hash.op_aref(context, value_s);
-                    RubyFixnum format = (RubyFixnum) hash.op_aref(context, format_s);
-
-                    if (format.getLongValue() == FORMAT_TEXT) {
-                      statement.setString(columnIndex, value.asJavaString());
-                    } else if (format.getLongValue() == FORMAT_BINARY) {
-                      statement.setBytes(columnIndex, value.getBytes());
-                    }
-                  } else {
-                    throw context.runtime.newArgumentError("parameters must be a string or hash");
-                  }
-                }
-              }
-              set = statement.executeQuery();
+              com.headius.jruby.pg_ext.PgPreparedStatement st = new com.headius.jruby.pg_ext.PgPreparedStatement(statement, indexToQueryParameter);
+              set = getPreparedStatmentResult(context, st, args);
             }
 
             Matcher matcher = ENCODING_PATTERN.matcher(query);
@@ -551,15 +536,59 @@ public class Connection extends RubyObject {
             throw newPgError(context, sqle.getLocalizedMessage(), encoding);
         }
 
-        // by default we return results in text format
-        boolean binary = false;
-        if (args.length == 3)
-          binary = ((RubyFixnum) args[2]).getLongValue() == FORMAT_BINARY;
+        return createResult(context, set, args, block);
+    }
 
-        Result result = new Result(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::Result"), set, encoding, binary);
-        if (block.isGiven())
-          return block.call(context, result);
-        return result;
+    private IRubyObject createResult(ThreadContext context, ResultSet set, IRubyObject [] args, Block block) {
+      // by default we return results in text format
+      boolean binary = false;
+      if (args.length == 3)
+        binary = ((RubyFixnum) args[2]).getLongValue() == FORMAT_BINARY;
+
+      Result result = new Result(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::Result"), set, encoding, binary);
+      if (block.isGiven())
+        return block.call(context, result);
+      return result;
+    }
+
+    private ResultSet getPreparedStatmentResult(ThreadContext context, PgPreparedStatement st, IRubyObject[] args) throws SQLException {
+      Map<Integer, List<Integer>> indexToQueryParameter = st.indexMapping;
+      PreparedStatement statement = st.st;
+
+      if (args.length == 1)
+        return statement.executeQuery();
+
+      IRubyObject[] params = ((RubyArray) args[1]).toJavaArrayUnsafe();
+
+      for (int i = 1; i <= params.length; i++) {
+        IRubyObject param = params[i - 1];
+        List<Integer> list = indexToQueryParameter.get(i);
+
+        for (int columnIndex : list) {
+          if (param == null || param.isNil()) {
+            statement.setNull(columnIndex, Types.OTHER);
+          } else if (param instanceof RubyString) {
+            statement.setString(columnIndex, ((RubyString) param).asJavaString());
+          } else if (param instanceof RubyHash) {
+            RubyHash hash = (RubyHash) param;
+
+            RubySymbol value_s = context.runtime.newSymbol("value");
+            RubySymbol format_s = context.runtime.newSymbol("format");
+
+            RubyString value = (RubyString) hash.op_aref(context, value_s);
+            RubyFixnum format = (RubyFixnum) hash.op_aref(context, format_s);
+
+            if (format.getLongValue() == FORMAT_TEXT) {
+              statement.setString(columnIndex, value.asJavaString());
+            } else if (format.getLongValue() == FORMAT_BINARY) {
+              statement.setBytes(columnIndex, value.getBytes());
+            }
+          } else {
+            throw context.runtime.newArgumentError("parameters must be a string or hash");
+          }
+        }
+      }
+      return statement.executeQuery();
     }
 
     /**
@@ -590,19 +619,41 @@ public class Connection extends RubyObject {
       return query.replaceAll("\\$\\d+", "?");
     }
 
-    @JRubyMethod(required = 1, rest = true)
+    @JRubyMethod(required = 2, rest = true)
     public IRubyObject prepare(ThreadContext context, IRubyObject[] args) {
-        return context.nil;
+      try {
+        String queryName = args[0].asJavaString();
+        String query = args[1].asJavaString();
+
+        Map<Integer, List<Integer>> indexMapping = new HashMap<Integer, List<Integer>>();
+        query = fixQueryParametersSyntax(query, indexMapping);
+        PreparedStatement _st = connection.prepareStatement(query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+        com.headius.jruby.pg_ext.PgPreparedStatement st = new com.headius.jruby.pg_ext.PgPreparedStatement(_st, indexMapping);
+        preparedQueries.put(queryName, st);
+
+        return get_empty_result(context);
+      } catch (SQLException e) {
+        throw newPgError(context, e.getLocalizedMessage(), encoding);
+      }
     }
 
-    @JRubyMethod(rest = true)
-    public IRubyObject exec_prepared(ThreadContext context, IRubyObject[] args) {
-        return context.nil;
+    @JRubyMethod(required = 1, optional = 2)
+    public IRubyObject exec_prepared(ThreadContext context, IRubyObject[] args, Block block) {
+      try {
+        String queryName = args[0].asJavaString();
+        PgPreparedStatement st = preparedQueries.get(queryName);
+        if (st == null)
+          throw context.runtime.newRuntimeError("Unknown query " + queryName);
+        ResultSet set = getPreparedStatmentResult(context, st, args);
+        return createResult(context, set, args, block);
+      } catch (SQLException e) {
+        throw newPgError(context, e.getLocalizedMessage(), encoding);
+      }
     }
 
-    @JRubyMethod
-    public IRubyObject describe_prepared(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
+    @JRubyMethod(required = 1)
+    public IRubyObject describe_prepared(ThreadContext context, IRubyObject query_name) {
+      return context.nil;
     }
 
     @JRubyMethod
