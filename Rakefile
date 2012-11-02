@@ -64,4 +64,17 @@ end
 Rake::Task[:spec].prerequisites << 'get-ruby-pg-specs'
 Rake::Task[:spec].prerequisites << :compile
 
+# sync specs from jruby-spec to spec/jruby
+target_dir = 'spec/jruby'
+directory target_dir
+Dir.glob('jruby-spec/*.rb').each do |f|
+  basename = File.basename f
+  new_name = "#{target_dir}/#{basename}"
+  t = file new_name => [f] do |t|
+    FileUtils.cp f, new_name
+  end
+  Rake::Task[:spec].prerequisites << t
+  puts "created task for file #{basename}, task: #{t}, f: #{f}"
+end
+
 # vim: syntax=ruby
