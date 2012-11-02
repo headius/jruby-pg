@@ -40,13 +40,12 @@ import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
 import org.postgresql.core.BaseConnection;
 import org.postgresql.core.Encoding;
-import org.postgresql.core.Oid;
-import org.postgresql.jdbc3.AbstractJdbc3Statement;
 import org.postgresql.largeobject.LargeObject;
 import org.postgresql.largeobject.LargeObjectManager;
 import org.postgresql.util.UnixCrypt;
 
 public class Connection extends RubyObject {
+    protected static Connection LAST_CONNECTION = null;
     protected BaseConnection connection;
     protected org.jcodings.Encoding encoding;
     protected IRubyObject rubyEncoding;
@@ -54,6 +53,9 @@ public class Connection extends RubyObject {
     private final static Pattern ENCODING_PATTERN = Pattern.compile("(?i).*set\\s+client_encoding\\s+(?:TO|=)\\s+'?(\\S+)'?.*");
     private final static Pattern PARAMS_PATTERN = Pattern.compile("(?:[^\\$]*(?:\\$(\\d+))[^\\$]*)");
     private final static Map<String, String> postgresEncodingToRubyEncoding = new HashMap<String, String>();
+
+    final static int FORMAT_TEXT = 0;
+    final static int FORMAT_BINARY = 1;
 
     static {
       postgresEncodingToRubyEncoding.put("BIG5",          "Big5"        );
@@ -127,7 +129,9 @@ public class Connection extends RubyObject {
 
     @JRubyMethod(meta = true, required = 1, argTypes = {RubyArray.class})
     public static IRubyObject escape_bytea(ThreadContext context, IRubyObject self, IRubyObject array) {
-      return escapeBytes(context, array, context.nil);
+      if (LAST_CONNECTION != null)
+        return LAST_CONNECTION.escape_bytea(context, array);
+      return escapeBytes(context, array, context.nil, false);
     }
 
     @JRubyMethod(meta = true)
@@ -164,47 +168,37 @@ public class Connection extends RubyObject {
         return context.nil;
     }
 
+    /**
+     * binary data is received from the jdbc driver after being unescaped
+     *
+     * @param context
+     * @param _array
+     * @return
+     */
     public static IRubyObject unescapeBytes (ThreadContext context, IRubyObject _array) {
-      ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-      byte[] bytes = ((RubyString) _array).getBytes();
-
-      int i = 0;
-      while (i < bytes.length) {
-        byte byteValue = bytes[i];
-        if (byteValue == '\\') {
-          // this is an escape sequence
-          i++;
-          if (bytes[i] == '\\') {
-            out.write('\\');
-          } else {
-            out.write(convertToByte(bytes[i], bytes[i + 1], bytes[i + 2]));
-            i += 2;
-          }
-        } else {
-          out.write(byteValue);
-        }
-        i++;
-      }
-
-      return context.runtime.newString(new ByteList(out.toByteArray()));
+      return _array;
     }
 
-    private static IRubyObject escapeBytes(ThreadContext context, IRubyObject _array, IRubyObject encoding) {
+    private static IRubyObject escapeBytes(ThreadContext context, IRubyObject _array, IRubyObject encoding, boolean standardConforminStrings) {
       RubyString array = (RubyString) _array;
       byte[] bytes = array.getBytes();
 
-      return escapeBytes(context, bytes, encoding);
+      return escapeBytes(context, bytes, encoding, standardConforminStrings);
     }
 
-    private static IRubyObject escapeBytes(ThreadContext context, byte[] bytes, IRubyObject encoding) {
-      return escapeBytes(context, bytes, 0, bytes.length, encoding);
+    private static IRubyObject escapeBytes(ThreadContext context, byte[] bytes, IRubyObject encoding, boolean standardConformingStrings) {
+      return escapeBytes(context, bytes, 0, bytes.length, encoding, standardConformingStrings);
     }
 
-    private static IRubyObject escapeBytes(ThreadContext context, byte[] bytes, int offset, int len, IRubyObject encoding) {
+    private static IRubyObject escapeBytes(ThreadContext context, byte[] bytes, int offset, int len,
+        IRubyObject encoding, boolean standardConformingStrings) {
       if (len < 0 || offset < 0 || offset + len > bytes.length) {
         throw context.runtime.newArgumentError("Oops array offset or length isn't correct");
       }
+
+      String prefix = "";
+      if (!standardConformingStrings)
+        prefix = "\\";
 
       ByteArrayOutputStream out = new ByteArrayOutputStream();
       PrintWriter writer = new PrintWriter(out);
@@ -212,12 +206,12 @@ public class Connection extends RubyObject {
         int byteValue= bytes[i] & 0xFF;
         if (byteValue == 39) {
           // escape the single quote
-          writer.write("\\\\047");
+          writer.append(prefix).append("\\047");
         } else if (byteValue == 92) {
           // escape the backslash
-          writer.write("\\\\134");
+          writer.append(prefix).append("\\134");
         } else if (byteValue >= 0 && byteValue <= 31 || byteValue >= 127 && byteValue <= 255) {
-          writer.printf("\\\\%03o", byteValue);
+          writer.append(prefix).printf("\\%03o", byteValue);
         } else {
           // all other characters, print as themselves
           writer.write(byteValue);
@@ -344,6 +338,8 @@ public class Connection extends RubyObject {
             connection = (BaseConnection)driver.connect(connectionString, props);
             // set the encoding if the default internal_encoding is set
             set_default_encoding(context);
+
+            LAST_CONNECTION = this;
         } catch (SQLException sqle) {
             throw context.runtime.newRuntimeError(sqle.getLocalizedMessage());
         }
@@ -502,8 +498,7 @@ public class Connection extends RubyObject {
         String query = args[0].convertToString().toString();
         ResultSet set = null;
         try {
-
-            if (args.length == 1) {
+            if (args.length == 1 || ((RubyArray) args[1]).getLength() == 0) {
               Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
               statement.execute(query);
               set = statement.getResultSet();
@@ -532,9 +527,9 @@ public class Connection extends RubyObject {
                     RubyString value = (RubyString) hash.op_aref(context, value_s);
                     RubyFixnum format = (RubyFixnum) hash.op_aref(context, format_s);
 
-                    if (format.getLongValue() == 0) {
+                    if (format.getLongValue() == FORMAT_TEXT) {
                       statement.setString(columnIndex, value.asJavaString());
-                    } else if (format.getLongValue() == 1) {
+                    } else if (format.getLongValue() == FORMAT_BINARY) {
                       statement.setBytes(columnIndex, value.getBytes());
                     }
                   } else {
@@ -556,9 +551,10 @@ public class Connection extends RubyObject {
             throw newPgError(context, sqle.getLocalizedMessage(), encoding);
         }
 
+        // by default we return results in text format
         boolean binary = false;
         if (args.length == 3)
-          binary = ((RubyFixnum) args[2]).getLongValue() == 1;
+          binary = ((RubyFixnum) args[2]).getLongValue() == FORMAT_BINARY;
 
         Result result = new Result(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::Result"), set, encoding, binary);
         if (block.isGiven())
@@ -566,9 +562,18 @@ public class Connection extends RubyObject {
         return result;
     }
 
-    // FIXME: the following method undo what the jdbc driver does; the driver expect "?" for query parameters
-    // and convert it to "$i" (where i is some integer). we have to convert "$i" to "?" for the driver to convert
-    // it back which is annoying
+    /**
+     * the following method undo what the jdbc driver does; the driver expect "?" for query parameters
+     * and convert it to "$i" (where i is some integer). we have to convert "$i" to "?" for the driver to convert
+     * it back which is annoying.
+     *
+     * FIXME: This method doesn't respect escaping or quoting rules, i.e. if the dollar sign is in single quotes
+     * we shouldn't touch it.
+     *
+     * @param query
+     * @param indexToQueryParameter
+     * @return
+     */
     private String fixQueryParametersSyntax(String query, Map<Integer, List<Integer>> indexToQueryParameter) {
       Matcher matcher = PARAMS_PATTERN.matcher(query);
       if (!matcher.matches())
@@ -585,7 +590,7 @@ public class Connection extends RubyObject {
       return query.replaceAll("\\$\\d+", "?");
     }
 
-    @JRubyMethod(rest = true)
+    @JRubyMethod(required = 1, rest = true)
     public IRubyObject prepare(ThreadContext context, IRubyObject[] args) {
         return context.nil;
     }
@@ -616,7 +621,7 @@ public class Connection extends RubyObject {
       byte[] bytes = str.getBytes();
       int i;
       for (i = 0; i < bytes.length && bytes[i] != '\0'; i++);
-      return escapeBytes(context, bytes, 0, i, rubyEncoding);
+      return escapeBytes(context, bytes, 0, i, rubyEncoding, connection.getStandardConformingStrings());
     }
 
     @JRubyMethod
@@ -626,7 +631,7 @@ public class Connection extends RubyObject {
 
     @JRubyMethod
     public IRubyObject escape_bytea(ThreadContext context, IRubyObject array) {
-      return escapeBytes(context, array, rubyEncoding);
+      return escapeBytes(context, array, rubyEncoding, connection.getStandardConformingStrings());
     }
 
     @JRubyMethod

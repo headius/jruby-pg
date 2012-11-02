@@ -316,9 +316,9 @@ public class Result extends RubyObject {
         RubyString string;
         if (bytes != null) {
           string = context.runtime.newString(new ByteList(bytes));
-          if (binary)
-            return string;
-          return Connection.unescapeBytes(context, string);
+          // FIXME: we always get the results in binary format, what if
+          // the user specify text format, should we escape the string ?
+          return string;
         }
         // fall through if this column is null
       case Types.NULL:
