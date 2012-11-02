@@ -213,7 +213,7 @@ public class Result extends RubyObject {
 
       try {
         boolean success = jdbcResultSet.absolute(index);
-        if (!success) return context.nil;
+        if (!success) throw context.runtime.newIndexError("Invalid column number " + index);
         return currentRowToHash(context);
       } catch (Exception e) {
           throw runtime.newRuntimeError(e.getLocalizedMessage());
