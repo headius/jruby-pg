@@ -507,7 +507,7 @@ public class Connection extends RubyObject {
 
     /******     PG::Connection INSTANCE METHODS: Command Execution     ******/
 
-    @JRubyMethod(name = {"exec", "query"}, required = 1, optional = 2)
+    @JRubyMethod(alias = {"query", "async_exec", "async_query"}, required = 1, optional = 2)
     public IRubyObject exec(ThreadContext context, IRubyObject[] args, Block block) {
         String query = args[0].convertToString().toString();
         ResultSet set = null;
@@ -846,11 +846,6 @@ public class Connection extends RubyObject {
 
     @JRubyMethod
     public IRubyObject quote_ident(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
-    }
-
-    @JRubyMethod(name = {"async_exec", "async_query"}, rest = true)
-    public IRubyObject async_exec(ThreadContext context, IRubyObject[] args) {
         return context.nil;
     }
 
