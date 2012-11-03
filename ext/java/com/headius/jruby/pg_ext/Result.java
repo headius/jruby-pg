@@ -21,14 +21,17 @@ import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
+import org.postgresql.core.BaseConnection;
 
 public class Result extends RubyObject {
     protected final ResultSet jdbcResultSet;
     protected final Encoding encoding;
     protected final boolean binary; // return results in binary format
+    private final BaseConnection connection;
 
-    public Result(Ruby ruby, RubyClass rubyClass, ResultSet resultSet, Encoding encoding, boolean binary) {
+    public Result(Ruby ruby, RubyClass rubyClass, BaseConnection connection, ResultSet resultSet, Encoding encoding, boolean binary) {
         super(ruby, rubyClass);
+        this.connection = connection;
 
         this.jdbcResultSet = resultSet;
         this.encoding = encoding;
@@ -127,9 +130,16 @@ public class Result extends RubyObject {
         return context.nil;
     }
 
-    @JRubyMethod
-    public IRubyObject ftype(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
+    @JRubyMethod(required = 1, argTypes = {RubyFixnum.class})
+    public IRubyObject ftype(ThreadContext context, IRubyObject fieldNumber) {
+      try {
+        int index = (int) ((RubyFixnum) fieldNumber).getLongValue();
+        String type = jdbcResultSet.getMetaData().getColumnTypeName(index);
+        int pgType = connection.getTypeInfo().getPGType(type);
+        return context.runtime.newFixnum(pgType);
+      } catch (SQLException e) {
+        throw Connection.newPgError(context, e.getLocalizedMessage(), encoding);
+      }
     }
 
     @JRubyMethod

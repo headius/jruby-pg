@@ -301,7 +301,7 @@ public class Connection extends RubyObject {
         if (EMPTY_RESULT == null) {
           BaseStatement st = ((BaseStatement) connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY));
           ResultSet set = st.createDriverResultSet(new Field[0], new Vector());
-          EMPTY_RESULT = new Result(context.runtime, (RubyClass) context.runtime.getClassFromPath("PG::Result"), set, null, false);
+          EMPTY_RESULT = new Result(context.runtime, (RubyClass) context.runtime.getClassFromPath("PG::Result"), connection, set, null, false);
         }
         return EMPTY_RESULT;
       } catch (SQLException e) {
@@ -545,7 +545,7 @@ public class Connection extends RubyObject {
       if (args.length == 3)
         binary = ((RubyFixnum) args[2]).getLongValue() == FORMAT_BINARY;
 
-      Result result = new Result(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::Result"), set, encoding, binary);
+      Result result = new Result(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::Result"), connection, set, encoding, binary);
       if (block.isGiven())
         return block.call(context, result);
       return result;
