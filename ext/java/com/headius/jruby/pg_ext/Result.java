@@ -95,7 +95,11 @@ public class Result extends RubyObject {
 
     @JRubyMethod(name = {"nfields", "num_fields"})
     public IRubyObject nfields(ThreadContext context) {
-        return context.nil;
+      try {
+        return context.runtime.newFixnum(jdbcResultSet.getMetaData().getColumnCount());
+      } catch (SQLException e) {
+        throw Connection.newPgError(context, e.getLocalizedMessage(), encoding);
+      }
     }
 
     @JRubyMethod
