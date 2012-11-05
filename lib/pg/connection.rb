@@ -14,6 +14,10 @@ class PG::Connection
 		return "'" + value.to_s.gsub( /[\\']/ ) {|m| '\\' + m } + "'"
 	end
 
+  def escape_literal str
+    "'#{escape_literal_native str}'"
+  end
+
 
 	### Parse the connection +args+ into a connection-parameter string. See PG::Connection.new
 	### for valid arguments.
