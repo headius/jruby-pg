@@ -73,7 +73,7 @@ directory target_dir
 Dir.glob('jruby-spec/*.rb').each do |f|
   basename = File.basename f
   new_name = "#{target_dir}/#{basename}"
-  t = file new_name => [f] do |t|
+  t = file new_name => [f, target_dir] do |t|
     FileUtils.cp f, new_name
   end
   Rake::Task[:'sync-files'].prerequisites << t
