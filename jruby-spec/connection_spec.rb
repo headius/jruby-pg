@@ -32,17 +32,62 @@ module PG::TestingHelpers
 end
 
 describe PG::Connection do
-  it 'assumes standard conforming strings is off before any connection is created' do
-    # make sure that there are no last connections cached
-    PG::Connection.reset_last_conn
-    foo = "\x00"
-    PG::Connection.escape_bytea(foo).should== "\\\\000"
-    @conn = setup_testing_db( "PG_Connection" )
-    @conn.exec 'SET standard_conforming_strings = on'
-    PG::Connection.escape_bytea(foo).should== "\\000"
-    @conn.exec 'SET standard_conforming_strings = off'
-    PG::Connection.escape_bytea(foo).should== "\\\\000"
-		teardown_testing_db( @conn )
+
+  describe 'basic connection properties' do
+    it 'correctly translates the server version' do
+      @conn.server_version.should >=(80200)
+    end
+
+    it 'quotes identifier correctly' do
+      table_name = @conn.quote_ident('foo')
+      column_name = @conn.quote_ident('bar')
+      @conn.exec "CREATE TABLE #{table_name} (#{column_name} text)"
+    end
+
+    it 'quotes identifier correctly when the static quote_ident is called' do
+      table_name = PG::Connection.quote_ident('foo')
+      column_name = PG::Connection.quote_ident('bar')
+      @conn.exec "CREATE TABLE #{table_name} (#{column_name} text)"
+    end
+
+    it 'assumes standard conforming strings is off before any connection is created' do
+      # make sure that there are no last connections cached
+      PG::Connection.reset_last_conn
+      foo = "\x00"
+      PG::Connection.escape_bytea(foo).should== "\\\\000"
+      @conn = setup_testing_db( "PG_Connection" )
+      @conn.exec 'SET standard_conforming_strings = on'
+      PG::Connection.escape_bytea(foo).should== "\\000"
+      @conn.exec 'SET standard_conforming_strings = off'
+      PG::Connection.escape_bytea(foo).should== "\\\\000"
+      teardown_testing_db( @conn )
+    end
+
+    it 'returns an empty result set when an INSERT is executed' do
+      res = @conn.exec 'CREATE TABLE foo (bar INT)'
+      res.should_not be_nil
+      res = @conn.exec 'INSERT INTO foo VALUES (1234)'
+      res.should_not be_nil
+      res.nfields.should ==(0)
+    end
+
+    it 'delete does not fail' do
+      @conn.exec 'CREATE TABLE foo (bar INT)'
+      @conn.exec 'INSERT INTO foo VALUES (1234)'
+      res = @conn.exec 'DELETE FROM foo WHERE bar = 1234'
+      res.should_not be_nil
+      res.nfields.should ==(0)
+    end
+
+    it 'returns id when a new row is inserted' do
+      @conn.exec 'CREATE TABLE foo (id SERIAL UNIQUE, bar INT)'
+      @conn.prepare 'query', 'INSERT INTO foo(bar) VALUES ($1) returning id'
+      @conn.send_query_prepared 'query', ['1234']
+      @conn.block
+      res = @conn.get_last_result
+      res.should_not be_nil
+      res.nfields.should ==(1)
+    end
   end
 
   describe 'prepared statements' do
@@ -93,6 +138,15 @@ describe PG::Connection do
       }.to raise_error(PGError, /does not exist/i)
     end
 
+    it 'can execute prepared queries that have no results' do
+      @conn.prepare 'create_query', 'CREATE TABLE FOO (BAR TEXT)'
+      res = @conn.exec_prepared 'create_query'
+      @conn.prepare 'insert_query', 'INSERT INTO FOO VALUES ($1)'
+      res = @conn.exec_prepared 'insert_query', ['baz']
+    end
+  end
+
+  describe 'error handling' do
     it 'should maintain a correct state after an error' do
       @conn.exec 'ROLLBACK'
 
@@ -104,7 +158,9 @@ describe PG::Connection do
         res = @conn.exec 'SELECT 1 / 0 AS n'
       }.to raise_error(PGError, /by zero/)
     end
+  end
 
+  describe 'query cancelling' do
     it 'should correctly accept queries after a query is cancelled' do
       @conn.exec 'ROLLBACK'
       @conn.send_query 'SELECT pg_sleep(1000)'
@@ -121,9 +177,6 @@ describe PG::Connection do
       @conn.exec 'ROLLBACK'
     end
 
-    # FIXME: how does this spec pass in ruby-pg without the last get_last_result
-    # not calling get_last_reuslt will leave the connection in a state that
-    # doesn't accept new queries and ROLLBACK will fail
     it "described_class#block should allow a timeout" do
       @conn.send_query( "select pg_sleep(3)" )
 
@@ -133,49 +186,9 @@ describe PG::Connection do
 
       (finish - start).should be_within( 0.05 ).of( 0.1 )
     end
+  end
 
-    it 'correctly translates the server version' do
-      @conn.server_version.should >=(80200)
-    end
-
-    it 'quotes identifier correctly' do
-      table_name = @conn.quote_ident('foo')
-      column_name = @conn.quote_ident('bar')
-      @conn.exec "CREATE TABLE #{table_name} (#{column_name} text)"
-    end
-
-    it 'quotes identifier correctly when the static quote_ident is called' do
-      table_name = PG::Connection.quote_ident('foo')
-      column_name = PG::Connection.quote_ident('bar')
-      @conn.exec "CREATE TABLE #{table_name} (#{column_name} text)"
-    end
-
-    it 'returns an empty result set when an INSERT is executed' do
-      res = @conn.exec 'CREATE TABLE foo (bar INT)'
-      res.should_not be_nil
-      res = @conn.exec 'INSERT INTO foo VALUES (1234)'
-      res.should_not be_nil
-      res.nfields.should ==(0)
-    end
-
-    it 'delete does not fail' do
-      @conn.exec 'CREATE TABLE foo (bar INT)'
-      @conn.exec 'INSERT INTO foo VALUES (1234)'
-      res = @conn.exec 'DELETE FROM foo WHERE bar = 1234'
-      res.should_not be_nil
-      res.nfields.should ==(0)
-    end
-
-    it 'returns id when a new row is inserted' do
-      @conn.exec 'CREATE TABLE foo (id SERIAL UNIQUE, bar INT)'
-      @conn.prepare 'query', 'INSERT INTO foo(bar) VALUES ($1) returning id'
-      @conn.send_query_prepared 'query', ['1234']
-      @conn.block
-      res = @conn.get_last_result
-      res.should_not be_nil
-      res.nfields.should ==(1)
-    end
-
+  describe 'authentication' do
     it 'can authenticate clients using the clear password' do
       @conn.exec 'ROLLBACK'
       begin
@@ -223,7 +236,9 @@ describe PG::Connection do
         @conn2 = PG.connect "#{@conninfo} user=nonexistentuser"
       }.to raise_error(RuntimeError, /does not exist/)
     end
+  end
 
+  describe 'large object api' do
     it "handles large object methods properly" do
       fd = oid = 0
       @conn.transaction do
@@ -272,7 +287,9 @@ describe PG::Connection do
         @conn.lo_read(fd, 10).should ==('foo')
       end
     end
+  end
 
+  describe 'COPY operations' do
     it 'can copy data in and out correctly' do
       @conn.exec %{ CREATE TABLE ALTERNATE_PARKING_NYC (
                     Subject text,

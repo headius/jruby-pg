@@ -1,6 +1,5 @@
 === 1.0.0 / 2012-10-25
 
-* 1 major enhancement
-
-  * Birthday!
+* BUG
+  * Prepared statements that don't return results hung
 
