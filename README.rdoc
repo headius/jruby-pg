@@ -4,38 +4,63 @@
 
 == DESCRIPTION:
 
-A Java implementation of the pg gem.
+This is a native implementation of the Postsgres protocol written
+entirely in Java. The project was started by @headius as a ruby-pg
+replacement for JRuby that uses the JDBC driver and private API of
+Postgres. Unfortunately ruby-pg (which uses libpq under the hood)
+exposed a lot of features of Postgres that were impossible to
+implement or were complicated given the nature of the JDBC and the
+encapsulation of many features that are exposed in ruby-pg.
 
-== FEATURES/PROBLEMS:
+== FEATURES:
 
-* FIX (list of features or problems)
+* A ruby-pg drop in replacement for JRuby
+* Async operations are supported
+* Large Object API
+* SSL connections
+* Copy operations
+* Zero dependencies on other jars and gems
 
-== SYNOPSIS:
+== PROBLEMS:
 
-  FIX (code sample of usage)
+* The current implementation targets postgres protocol V3 (introduced in v 7.4)
+only. I'll wait until someone ask for support of earlier versions.
+* We need better test coverage since we're doing more than ruby-pg
+* Run ActiveRecord and pg_search test suites on this implementation
+* lo_import and lo_export are not implemented yet
+* More Documentation especially in the parts that deal with the protocol.
 
 == REQUIREMENTS:
 
-* FIX (list of requirements)
+* Just a Postgres server and the gem.
 
 == INSTALL:
 
-* FIX (sudo gem install, anything else)
+* Currently we don't have the gem on rubygems, but I'll work on that if we can
+get a stable version out.
 
 == DEVELOPERS:
 
 After checking out the source, run:
 
-  $ rake newb
+  $ rake
 
-This task will install any missing dependencies, run the tests/specs,
-and generate the RDoc.
+This task will install any missing dependencies, run the tests/specs.
+
+There are currently two test suites that run, the ruby-pg specs and
+more specs targetted towards the JRuby implementation details in
+jruby-spec. When you run `rake` both test suites are merged under
+the 'spec' directory.
+
+You can set PG_TEST_SLL to 1, e.g. `PG_TEST_SLL=1 rake` to run the
+entire test suite using SSL sockets instead of plain sockets. Also
+`test_all.sh` runs the test suite with and without SSL.
 
 == LICENSE:
 
 (The MIT License)
 
-Copyright (c) 2012 FIX
+Copyright (c) 2012 John V. Shahid and Charles Nutter.
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
