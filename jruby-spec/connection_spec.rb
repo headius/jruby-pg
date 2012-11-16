@@ -25,6 +25,7 @@ module PG::TestingHelpers
       f.puts "ssl = yes"
     end
     FileUtils.cp "#{certs_directory}/server.key", @test_pgdata
+    File.chmod 0400, "#{@test_pgdata}/server.key"
     FileUtils.cp "#{certs_directory}/server.crt", @test_pgdata
     tmp
   end
