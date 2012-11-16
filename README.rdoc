@@ -30,6 +30,8 @@ encapsulation of many features that are exposed in ruby-pg.
 * lo_import and lo_export are not implemented yet
 * More Documentation especially in the parts that deal with the protocol.
 * We currently have some failing tests when we run the activerecord test suite.
+* Profiling the library would be awesome, but will try to get it running first
+  then optimize.
 
 == REQUIREMENTS:
 
