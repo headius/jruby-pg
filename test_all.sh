@@ -5,9 +5,15 @@
 # rake                            # test without ssl
 # PG_TEST_SLL=1 rake              # test with ssl
 
-rake package
-pg_pkg=$(readlink -f $(ls -tr pkg/*.gem | head))
-pg_ver=$(ruby -Ilib -rpg -e 'puts PG::VERSION')
+rake package && \
+    pg_pkg=$(readlink -f $(ls -tr pkg/*.gem | head)) && \
+    pg_ver=$(ruby -Ilib -rpg -e 'puts PG::VERSION')
+
+if [ ! $? ]; then
+    echo "Cannot package the pg gem, fix the errors and try again"
+    exit 1
+fi
+
 # Run rails test suite
 rails_dir=tmp_rails
 if [ ! -d $rails_dir ]; then
@@ -27,9 +33,12 @@ pushd $rails_dir
 git checkout .
 git fetch --all && git rebase origin/master
 
+# replace the jdbc gem with pg and force rails to use us instead
 grep -E -v 'pg' Gemfile > $TMPDIR/gemfile_wo_ruby_pg
 sed -E "s/gem 'activerecord-jdbcpostgresql.*/gem 'pg', '${pg_ver}'/g" $TMPDIR/gemfile_wo_ruby_pg > $TMPDIR/gemfile_with_jruby_pg
 grep -E -v "jdbc" $TMPDIR/gemfile_with_jruby_pg > Gemfile
+
+# finish the setup and start running the tests
 source ~/.rvm/scripts/rvm
 rvm use --create jruby@rails-test-jruby-pg
 gem uninstall pg -a -x
