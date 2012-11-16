@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |s|
   s.name = "pg"
-  s.version = "0.14.1.rc1.20121116105858"
+  s.version = "0.14.1.rc1"
   s.platform = "java"
 
   s.required_rubygems_version = Gem::Requirement.new("> 1.3.1") if s.respond_to? :required_rubygems_version=
