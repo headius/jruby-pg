@@ -12,6 +12,12 @@ exposed a lot of features of Postgres that were impossible to
 implement or were complicated given the nature of the JDBC and the
 encapsulation of many features that are exposed in ruby-pg.
 
+*WARNING* that this gem is not production ready yet. There are many
+bugs that needs to be fixed and more testing. So please checkout
+the code and submit pull requests with some fixes. If your Java-Fu
+isn't that great you can still contribute by submitting test cases
+and We'll be happy to fix them.
+
 == FEATURES:
 
 * A ruby-pg drop in replacement for JRuby
