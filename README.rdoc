@@ -29,6 +29,7 @@ encapsulation of many features that are exposed in ruby-pg.
 * Run ActiveRecord and pg_search test suites on this implementation
 * lo_import and lo_export are not implemented yet
 * More Documentation especially in the parts that deal with the protocol.
+* We currently have some failing tests when we run the activerecord test suite.
 
 == REQUIREMENTS:
 
@@ -40,6 +41,17 @@ encapsulation of many features that are exposed in ruby-pg.
   get a stable version out.
 
 == DEVELOPERS:
+
+You'll need postgres to be installed on your system. In order for you
+to be able to run rails test suite, you'll also need the +hstore+ extension
+which is also available in the +postgresql-contrib+ Ubuntu package (see
+http://www.postgresql.org/docs/9.0/static/hstore.htmlhttp://www.postgresql.org/docs/9.0/static/hstore.html)
+for more info.
+
+You'll also need to create a new super user using your username and no password. You can
+use the following command to do that:
+
+  $ sudo -u postgres createuser -s <insert your username here>
 
 After checking out the source, run:
 
