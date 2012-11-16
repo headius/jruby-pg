@@ -1,0 +1,88 @@
+= pg
+
+* https://github.com/headius/jruby-pg
+
+== DESCRIPTION:
+
+This is a native implementation of the Postsgres protocol written
+entirely in Java. The project was started by @headius as a ruby-pg
+replacement for JRuby that uses the JDBC driver and private API of
+Postgres. Unfortunately ruby-pg (which uses libpq under the hood)
+exposed a lot of features of Postgres that were impossible to
+implement or were complicated given the nature of the JDBC and the
+encapsulation of many features that are exposed in ruby-pg.
+
+== FEATURES:
+
+* A ruby-pg drop in replacement for JRuby
+* Async operations are supported
+* Large Object API
+* SSL connections
+* Copy operations
+* Zero dependencies on other jars and gems
+
+== PROBLEMS:
+
+* The current implementation targets postgres protocol V3 (introduced in v 7.4)
+  only. I'll wait until someone ask for support of earlier versions.
+* We need better test coverage since we're doing more than ruby-pg
+* Run ActiveRecord and pg_search test suites on this implementation
+* lo_import and lo_export are not implemented yet
+* More Documentation especially in the parts that deal with the protocol.
+
+== REQUIREMENTS:
+
+* Just a Postgres server and the gem.
+
+== INSTALL:
+
+* Currently we don't have the gem on rubygems, but I'll work on that if we can
+  get a stable version out.
+
+== DEVELOPERS:
+
+After checking out the source, run:
+
+  $ rake
+
+This task will install any missing dependencies, run the tests/specs.
+
+There are currently two test suites that run, the ruby-pg specs and
+more specs targetted towards the JRuby implementation details in
+jruby-spec. When you run `rake` both test suites are merged under
+the 'spec' directory.
+
+You can set +PG_TEST_SLL+ to 1, e.g.
+
+  $ PG_TEST_SLL=1 rake
+
+to run the entire test suite using SSL sockets instead of plain sockets. Also
+
+  $ test_all.sh
+
+runs the test suite with and without SSL.
+
+== LICENSE:
+
+(The MIT License)
+
+Copyright (c) 2012 John V. Shahid and Charles Nutter.
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+'Software'), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

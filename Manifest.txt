@@ -1,0 +1,12 @@
+CHANGELOG.rdoc
+Manifest.txt
+README.rdoc
+Rakefile
+bin/pg
+lib/pg.rb
+lib/pg/result.rb
+lib/pg/constants.rb
+lib/pg/connection.rb
+lib/pg/exceptions.rb
+lib/postgresql-9.1-903.jdbc4.jar
+lib/pg/pg.jar

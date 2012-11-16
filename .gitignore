@@ -1,0 +1,7 @@
+*~
+tmp/
+pg_ext.jar
+tmp_test_specs/
+pkg/
+.classpath
+.project
