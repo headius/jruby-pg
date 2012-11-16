@@ -24,15 +24,11 @@ import org.jruby.pg.internal.messages.Format;
  * @author jvshahid
  */
 public class LargeObjectAPI {
-  /**
-   * This mode indicates we want to write to an object
-   */
   public static final int WRITE = 0x00020000;
-
-  /**
-   * This mode indicates we want to read an object
-   */
   public static final int READ  = 0x00040000;
+  public static final int SEEK_SET = 0;
+  public static final int SEEK_CUR = 1;
+  public static final int SEEK_END = 2;
 
   public LargeObjectAPI(PostgresqlConnection postgresqlConnection) {
     this.postgresqlConnection = postgresqlConnection;

@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
-import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -45,9 +44,6 @@ import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
-import org.postgresql.core.BaseConnection;
-import org.postgresql.core.Encoding;
-import org.postgresql.util.UnixCrypt;
 
 public class Connection extends RubyObject {
     private final static Pattern ENCODING_PATTERN = Pattern.compile("(?i).*set\\s+client_encoding\\s+(?:TO|=)\\s+'?(\\S+)'?.*");
@@ -57,7 +53,6 @@ public class Connection extends RubyObject {
 
     protected static Connection LAST_CONNECTION = null;
 
-    protected BaseConnection connection;
     protected PostgresqlConnection postgresqlConnection;
     protected org.jcodings.Encoding encoding;
     protected IRubyObject rubyEncoding;
@@ -150,8 +145,12 @@ public class Connection extends RubyObject {
       if (username.isNil() || password.isNil())
         throw context.runtime.newTypeError("usernamd ane password cannot be nil");
 
-      byte[] cryptedPassword = UnixCrypt.crypt(((RubyString) username).getBytes(), ((RubyString) password).getBytes());
-      return context.runtime.newString(new ByteList(cryptedPassword));
+      try {
+        byte[] cryptedPassword = PostgresqlConnection.encrypt(((RubyString) username).getBytes(), ((RubyString) password).getBytes());
+        return context.runtime.newString(new ByteList(cryptedPassword));
+      } catch (Exception e) {
+        throw context.runtime.newRuntimeError(e.getLocalizedMessage());
+      }
     }
 
     @JRubyMethod(meta = true)
@@ -1160,13 +1159,7 @@ public class Connection extends RubyObject {
 
     @JRubyMethod
     public IRubyObject external_encoding(ThreadContext context) {
-      try {
-        Encoding encoding = connection.getEncoding();
-        IRubyObject rubyEncoding = findEncoding(context, encoding.name());
-        return rubyEncoding;
-      } catch (SQLException e) {
-        throw context.runtime.newRuntimeError(e.getLocalizedMessage());
-      }
+      return context.nil;
     }
 
     @JRubyMethod

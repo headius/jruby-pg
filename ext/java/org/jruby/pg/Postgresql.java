@@ -3,11 +3,12 @@ package org.jruby.pg;
 import java.io.IOException;
 
 import org.jruby.Ruby;
-import org.jruby.RubyClass;
 import org.jruby.RubyFixnum;
 import org.jruby.RubyModule;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.pg.internal.ConnectionState;
+import org.jruby.pg.internal.LargeObjectAPI;
+import org.jruby.pg.internal.Oid;
 import org.jruby.pg.internal.ResultSet.ResultStatus;
 import org.jruby.pg.internal.messages.ErrorResponse;
 import org.jruby.pg.internal.messages.ErrorResponse.ErrorField;
@@ -15,9 +16,6 @@ import org.jruby.pg.internal.messages.TransactionStatus;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.load.Library;
-import org.postgresql.core.Oid;
-import org.postgresql.largeobject.LargeObject;
-import org.postgresql.largeobject.LargeObjectManager;
 
 public class Postgresql implements Library {
     @Override
@@ -37,11 +35,11 @@ public class Postgresql implements Library {
           pgConstants.defineConstant(status.name(), ruby.newFixnum(status.ordinal()));
 
         // create the large object constants
-        pgConstants.defineConstant("INV_READ", new RubyFixnum(ruby, LargeObjectManager.READ));
-        pgConstants.defineConstant("INV_WRITE", new RubyFixnum(ruby, LargeObjectManager.WRITE));
-        pgConstants.defineConstant("SEEK_SET", new RubyFixnum(ruby, LargeObject.SEEK_SET));
-        pgConstants.defineConstant("SEEK_END", new RubyFixnum(ruby, LargeObject.SEEK_END));
-        pgConstants.defineConstant("SEEK_CUR", new RubyFixnum(ruby, LargeObject.SEEK_CUR));
+        pgConstants.defineConstant("INV_READ", new RubyFixnum(ruby, LargeObjectAPI.READ));
+        pgConstants.defineConstant("INV_WRITE", new RubyFixnum(ruby, LargeObjectAPI.WRITE));
+        pgConstants.defineConstant("SEEK_SET", new RubyFixnum(ruby, LargeObjectAPI.SEEK_SET));
+        pgConstants.defineConstant("SEEK_END", new RubyFixnum(ruby, LargeObjectAPI.SEEK_END));
+        pgConstants.defineConstant("SEEK_CUR", new RubyFixnum(ruby, LargeObjectAPI.SEEK_CUR));
 
         // create error fields objects
         for (ErrorField field : ErrorResponse.ErrorField.values())
