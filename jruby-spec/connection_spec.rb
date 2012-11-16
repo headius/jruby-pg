@@ -32,6 +32,21 @@ module PG::TestingHelpers
 end
 
 describe PG::Connection do
+  before(:all) do
+    @conn = setup_testing_db( "PG_Connection" )
+  end
+
+  before( :each ) do
+    @conn.exec( 'BEGIN' ) unless example.metadata[:without_transaction]
+  end
+
+  after( :each ) do
+    @conn.exec( 'ROLLBACK' ) unless example.metadata[:without_transaction]
+  end
+
+  after(:all) do
+    teardown_testing_db( @conn )
+  end
 
   describe 'basic connection properties' do
     it 'correctly translates the server version' do
@@ -96,22 +111,6 @@ describe PG::Connection do
   end
 
   describe 'prepared statements' do
-    before(:all) do
-      @conn = setup_testing_db( "PG_Connection" )
-    end
-
-    before( :each ) do
-      @conn.exec( 'BEGIN' ) unless example.metadata[:without_transaction]
-    end
-
-    after( :each ) do
-      @conn.exec( 'ROLLBACK' ) unless example.metadata[:without_transaction]
-    end
-
-    after(:all) do
-      teardown_testing_db( @conn )
-    end
-
     it 'execute successfully' do
       @conn.prepare '', 'SELECT 1 AS n'
       res = @conn.exec_prepared ''
