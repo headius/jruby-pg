@@ -24,7 +24,7 @@ encapsulation of many features that are exposed in ruby-pg.
 == PROBLEMS:
 
 * The current implementation targets postgres protocol V3 (introduced in v 7.4)
-only. I'll wait until someone ask for support of earlier versions.
+  only. I'll wait until someone ask for support of earlier versions.
 * We need better test coverage since we're doing more than ruby-pg
 * Run ActiveRecord and pg_search test suites on this implementation
 * lo_import and lo_export are not implemented yet
@@ -37,7 +37,7 @@ only. I'll wait until someone ask for support of earlier versions.
 == INSTALL:
 
 * Currently we don't have the gem on rubygems, but I'll work on that if we can
-get a stable version out.
+  get a stable version out.
 
 == DEVELOPERS:
 
@@ -52,9 +52,15 @@ more specs targetted towards the JRuby implementation details in
 jruby-spec. When you run `rake` both test suites are merged under
 the 'spec' directory.
 
-You can set PG_TEST_SLL to 1, e.g. `PG_TEST_SLL=1 rake` to run the
-entire test suite using SSL sockets instead of plain sockets. Also
-`test_all.sh` runs the test suite with and without SSL.
+You can set +PG_TEST_SLL+ to 1, e.g.
+
+  $ PG_TEST_SLL=1 rake
+
+to run the entire test suite using SSL sockets instead of plain sockets. Also
+
+  $ test_all.sh
+
+runs the test suite with and without SSL.
 
 == LICENSE:
 
