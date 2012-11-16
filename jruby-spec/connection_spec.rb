@@ -63,6 +63,11 @@ describe PG::Connection do
       teardown_testing_db( @conn )
     end
 
+    it 'handles NULL columns properly' do
+      res = @conn.exec 'VALUES (NULL)'
+      res.getvalue( 0, 0 ).should be_nil
+    end
+
     it 'returns an empty result set when an INSERT is executed' do
       res = @conn.exec 'CREATE TABLE foo (bar INT)'
       res.should_not be_nil

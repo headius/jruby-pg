@@ -2,4 +2,5 @@
 
 * BUG
   * Prepared statements that don't return results hung
+  * Result.getvalue dies on NULL value
 
