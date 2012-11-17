@@ -139,6 +139,8 @@ public enum ConnectionState {
       return ExtendedReadyForQuery;
     case ReadingDescribeResponse:
       switch (receivedMessageType) {
+      case NoData:
+        return ExtendedReadyForQuery;
       case RowDescription:
         return ExtendedReadyForQuery;
       case ParameterDescription:
