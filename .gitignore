@@ -1,5 +1,6 @@
 *~
-tmp/
+tmp*/
+*.class
 pg_ext.jar
 tmp_test_specs/
 pkg/

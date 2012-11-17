@@ -161,6 +161,8 @@ public class ProtocolMessageBuffer {
       return new CopyData(rest);
     case 'c':
       return new CopyDone();
+    case 'n':
+      return new NoData();
     case 'Z':
       byte transactionStatus = rest.get();
       return new ReadyForQuery(TransactionStatus.fromByte(transactionStatus), rest.capacity() + 4);
