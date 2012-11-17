@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 require 'rspec'
 require 'spec/lib/helpers'
 require 'pg'
@@ -70,12 +72,12 @@ describe PG::Connection do
       PG::Connection.reset_last_conn
       foo = "\x00"
       PG::Connection.escape_bytea(foo).should== "\\\\000"
-      @conn = setup_testing_db( "PG_Connection" )
-      @conn.exec 'SET standard_conforming_strings = on'
+      conn = PG.connect "#{@conninfo} user=password password=secret"
+      conn.exec 'SET standard_conforming_strings = on'
       PG::Connection.escape_bytea(foo).should== "\\000"
-      @conn.exec 'SET standard_conforming_strings = off'
+      conn.exec 'SET standard_conforming_strings = off'
       PG::Connection.escape_bytea(foo).should== "\\\\000"
-      teardown_testing_db( @conn )
+      conn.finish
     end
 
     it 'handles NULL columns properly' do
@@ -114,6 +116,20 @@ describe PG::Connection do
       res = @conn.get_last_result
       res.should_not be_nil
       res.nfields.should ==(1)
+    end
+  end
+
+  describe 'encoding' do
+    it 'handles ascii strings properly' do
+      str = 'foo'
+      res = @conn.exec 'VALUES ($1::text)', [str]
+      res.getvalue(0, 0).should == str
+    end
+
+    it 'handles any utf-8 strings properly' do
+      str = 'いただきます！'
+      res = @conn.exec 'VALUES ($1::text)', [str]
+      res.getvalue(0, 0).should == str
     end
   end
 
@@ -207,7 +223,8 @@ describe PG::Connection do
       rescue
         # ignore
       end
-      @conn2 = PG.connect "#{@conninfo} user=password password=secret"
+      conn = PG.connect "#{@conninfo} user=password password=secret"
+      conn.finish
     end
 
     it 'fails if no password was given and a password is required' do
@@ -218,7 +235,7 @@ describe PG::Connection do
         rescue
           # ignore
         end
-        @conn2 = PG.connect "#{@conninfo} user=password"
+        conn = PG.connect "#{@conninfo} user=password"
       }.to raise_error(RuntimeError, /authentication failed/)
     end
 
@@ -229,7 +246,8 @@ describe PG::Connection do
       rescue
         # ignore
       end
-      @conn2 = PG.connect "#{@conninfo} user=ssl password=secret ssl=require"
+      conn = PG.connect "#{@conninfo} user=ssl password=secret ssl=require"
+      conn.finish
     end
 
     it 'can authenticate clients using the md5 hash' do
@@ -239,12 +257,13 @@ describe PG::Connection do
       rescue
         # ignore
       end
-      @conn2 = PG.connect "#{@conninfo} user=encrypt password=md5"
+      conn = PG.connect "#{@conninfo} user=encrypt password=md5"
+      conn.finish
     end
 
     it 'fails if the user does not exist' do
       expect {
-        @conn2 = PG.connect "#{@conninfo} user=nonexistentuser"
+        conn = PG.connect "#{@conninfo} user=nonexistentuser"
       }.to raise_error(RuntimeError, /does not exist/)
     end
   end

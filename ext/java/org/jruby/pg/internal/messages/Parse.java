@@ -3,12 +3,14 @@ package org.jruby.pg.internal.messages;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 
+import org.jruby.pg.internal.PostgresqlString;
+
 public class Parse extends ProtocolMessage {
 
   private final byte[] bytes;
   private final int length;
 
-  public Parse(String name, String query, int [] oids) {
+  public Parse(PostgresqlString name, PostgresqlString query, int [] oids) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     try {
       out.write('P');

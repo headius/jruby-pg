@@ -3,13 +3,14 @@ package org.jruby.pg.internal.messages;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 
+import org.jruby.pg.internal.PostgresqlString;
 import org.jruby.pg.internal.Value;
 
 public class Bind extends ProtocolMessage {
   private final byte[] bytes;
   private final int length;
 
-  public Bind(String destinationPortal, String sourceStatement, Value[] params, Format format) {
+  public Bind(PostgresqlString destinationPortal, PostgresqlString sourceStatement, Value[] params, Format format) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     try {
       out.write('B');

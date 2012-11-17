@@ -54,7 +54,7 @@ public class LargeObjectAPI {
     ByteBuffer buffer = ByteBuffer.allocate(4);
     buffer.putInt(argValue);
     Value value = new Value(buffer.array(), Format.Binary);
-    ResultSet result = postgresqlConnection.execQueryParams("select " + functionName + "($1)", new Value[] { value },
+    ResultSet result = postgresqlConnection.execQueryParams(createString("select " + functionName + "($1)"), new Value[] { value },
         Format.Binary, new int[0]);
     if (result.hasError()) {
       throw new PostgresqlException(result.getError().getErrorMesssage(), result);
@@ -70,7 +70,7 @@ public class LargeObjectAPI {
     buffer.putInt(fd);
     Value fdValue = new Value(buffer.array(), Format.Binary);
     Value byteValue = new Value(bytes, Format.Binary);
-    ResultSet result = postgresqlConnection.execQueryParams("select lowrite($1, $2)",
+    ResultSet result = postgresqlConnection.execQueryParams(createString("select lowrite($1, $2)"),
         new Value[] { fdValue, byteValue }, Format.Binary, new int[0]);
     if (result.hasError()) {
       throw new PostgresqlException(result.getError().getErrorMesssage(), result);
@@ -94,7 +94,7 @@ public class LargeObjectAPI {
 
     Value fdValue = new Value(fdBytes, Format.Binary);
     Value countValue = new Value(countBytes, Format.Binary);
-    ResultSet result = postgresqlConnection.execQueryParams("select loread($1, $2)",
+    ResultSet result = postgresqlConnection.execQueryParams(createString("select loread($1, $2)"),
         new Value[] { fdValue, countValue }, Format.Binary, new int[0]);
     if (result.hasError()) {
       throw new PostgresqlException(result.getError().getErrorMesssage(), result);
@@ -126,7 +126,7 @@ public class LargeObjectAPI {
     Value fdValue = new Value(fdBytes, Format.Binary);
     Value offsetValue = new Value(offsetBytes, Format.Binary);
     Value whenceValue = new Value(whenceBytes, Format.Binary);
-    ResultSet result = postgresqlConnection.execQueryParams("select lo_lseek($1, $2, $3)", new Value[] { fdValue,
+    ResultSet result = postgresqlConnection.execQueryParams(createString("select lo_lseek($1, $2, $3)"), new Value[] { fdValue,
         offsetValue, whenceValue }, Format.Binary, new int[0]);
     if (result.hasError()) {
       throw new PostgresqlException(result.getError().getErrorMesssage(), result);
@@ -156,7 +156,7 @@ public class LargeObjectAPI {
     buffer.get(fdBytes);
 
     Value fdValue = new Value(fdBytes, Format.Binary);
-    ResultSet result = postgresqlConnection.execQueryParams("select " + name + "($1)", new Value[] { fdValue }, Format.Binary, new int[0]);
+    ResultSet result = postgresqlConnection.execQueryParams(createString("select " + name + "($1)"), new Value[] { fdValue }, Format.Binary, new int[0]);
     if (result.hasError()) {
       throw new PostgresqlException(result.getError().getErrorMesssage(), result);
     }
@@ -183,12 +183,16 @@ public class LargeObjectAPI {
 
     Value value1Value = new Value(value1Bytes, Format.Binary);
     Value value2Value = new Value(value2Bytes, Format.Binary);
-    ResultSet result = postgresqlConnection.execQueryParams("select " + name + "($1, $2)",
+    ResultSet result = postgresqlConnection.execQueryParams(createString("select " + name + "($1, $2)"),
         new Value[] { value1Value, value2Value }, Format.Binary, new int[0]);
     if (result.hasError()) {
       throw new PostgresqlException(result.getError().getErrorMesssage(), result);
     }
     ByteBuffer value = result.getRows().get(0).getValues()[0];
     return value.getInt();
+  }
+
+  private PostgresqlString createString(String value) {
+    return new PostgresqlString(value);
   }
 }

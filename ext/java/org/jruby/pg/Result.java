@@ -183,12 +183,7 @@ public class Result extends RubyObject {
       if (column >= columns.length) {
         throw context.runtime.newIndexError("column " + column + " is out of range");
       }
-      ByteBuffer buffer = columns[column];
-      if (buffer == null) {
-        return context.nil;
-      }
-      byte[] bytes = buffer.array();
-      return context.runtime.newString(new ByteList(bytes, buffer.arrayOffset() + buffer.position(), buffer.remaining()));
+      return valueAsString(context, row, column);
     }
 
     @JRubyMethod

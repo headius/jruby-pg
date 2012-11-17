@@ -10,9 +10,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
+import org.jcodings.Encoding;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyClass;
@@ -33,6 +32,7 @@ import org.jruby.pg.internal.ConnectionState;
 import org.jruby.pg.internal.LargeObjectAPI;
 import org.jruby.pg.internal.PostgresqlConnection;
 import org.jruby.pg.internal.PostgresqlException;
+import org.jruby.pg.internal.PostgresqlString;
 import org.jruby.pg.internal.ResultSet;
 import org.jruby.pg.internal.Value;
 import org.jruby.pg.internal.messages.CopyData;
@@ -46,17 +46,18 @@ import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
 
 public class Connection extends RubyObject {
-    private final static Pattern ENCODING_PATTERN = Pattern.compile("(?i).*set\\s+client_encoding\\s+(?:TO|=)\\s+'?(\\S+)'?.*");
     private final static Map<String, String> postgresEncodingToRubyEncoding = new HashMap<String, String>();
+    private final static Map<String, String> rubyEncodingToPostgresEncoding = new HashMap<String, String>();
     protected final static int FORMAT_TEXT = 0;
     protected final static int FORMAT_BINARY = 1;
 
     protected static Connection LAST_CONNECTION = null;
 
     protected PostgresqlConnection postgresqlConnection;
-    protected org.jcodings.Encoding encoding;
-    protected IRubyObject rubyEncoding;
-    protected Map<String, org.jruby.pg.PgPreparedStatement> preparedQueries = new HashMap<String, org.jruby.pg.PgPreparedStatement>();
+
+    protected PostgresqlString BEGIN_QUERY = new PostgresqlString("BEGIN");
+    protected PostgresqlString COMMIT_QUERY = new PostgresqlString("COMMIT");
+    protected PostgresqlString ROLLBACK_QUERY = new PostgresqlString("ROLLBACK");
 
     static {
       postgresEncodingToRubyEncoding.put("BIG5",          "Big5"        );
@@ -100,12 +101,51 @@ public class Connection extends RubyObject {
       postgresEncodingToRubyEncoding.put("WIN1256",       "Windows-1256");
       postgresEncodingToRubyEncoding.put("WIN1257",       "Windows-1257");
       postgresEncodingToRubyEncoding.put("WIN1258",       "Windows-1258");
+
+      // set the mapping from ruby encoding to postgresql encoding
+      rubyEncodingToPostgresEncoding.put("Big5",          "BIG5"          );
+      rubyEncodingToPostgresEncoding.put("GB2312",        "EUC_CN"        );
+      rubyEncodingToPostgresEncoding.put("EUC-JP",        "EUC_JP"        );
+      rubyEncodingToPostgresEncoding.put("EUC-KR",        "EUC_KR"        );
+      rubyEncodingToPostgresEncoding.put("EUC-TW",        "EUC_TW"        );
+      rubyEncodingToPostgresEncoding.put("GB18030",       "GB18030"       );
+      rubyEncodingToPostgresEncoding.put("GBK",           "GBK"           );
+      rubyEncodingToPostgresEncoding.put("KOI8-R",        "KOI8"          );
+      rubyEncodingToPostgresEncoding.put("KOI8-U",        "KOI8U"         );
+      rubyEncodingToPostgresEncoding.put("ISO-8859-1",    "LATIN1"        );
+      rubyEncodingToPostgresEncoding.put("ISO-8859-2",    "LATIN2"        );
+      rubyEncodingToPostgresEncoding.put("ISO-8859-3",    "LATIN3"        );
+      rubyEncodingToPostgresEncoding.put("ISO-8859-4",    "LATIN4"        );
+      rubyEncodingToPostgresEncoding.put("ISO-8859-5",    "ISO_8859_5"    );
+      rubyEncodingToPostgresEncoding.put("ISO-8859-6",    "ISO_8859_6"    );
+      rubyEncodingToPostgresEncoding.put("ISO-8859-7",    "ISO_8859_7"    );
+      rubyEncodingToPostgresEncoding.put("ISO-8859-8",    "ISO_8859_8"    );
+      rubyEncodingToPostgresEncoding.put("ISO-8859-9",    "LATIN5"        );
+      rubyEncodingToPostgresEncoding.put("ISO-8859-10",   "LATIN6"        );
+      rubyEncodingToPostgresEncoding.put("ISO-8859-13",   "LATIN7"        );
+      rubyEncodingToPostgresEncoding.put("ISO-8859-14",   "LATIN8"        );
+      rubyEncodingToPostgresEncoding.put("ISO-8859-15",   "LATIN9"        );
+      rubyEncodingToPostgresEncoding.put("ISO-8859-16",   "LATIN10"       );
+      rubyEncodingToPostgresEncoding.put("Emacs-Mule",    "MULE_INTERNAL" );
+      rubyEncodingToPostgresEncoding.put("Windows-31J",   "SJIS"          );
+      rubyEncodingToPostgresEncoding.put("Windows-31J",   "SHIFT_JIS_2004");
+      rubyEncodingToPostgresEncoding.put("UHC",           "CP949"         );
+      rubyEncodingToPostgresEncoding.put("UTF-8",         "UTF8"          );
+      rubyEncodingToPostgresEncoding.put("IBM866",        "WIN866"        );
+      rubyEncodingToPostgresEncoding.put("Windows-874",   "WIN874"        );
+      rubyEncodingToPostgresEncoding.put("Windows-1250",  "WIN1250"       );
+      rubyEncodingToPostgresEncoding.put("Windows-1251",  "WIN1251"       );
+      rubyEncodingToPostgresEncoding.put("Windows-1252",  "WIN1252"       );
+      rubyEncodingToPostgresEncoding.put("Windows-1253",  "WIN1253"       );
+      rubyEncodingToPostgresEncoding.put("Windows-1254",  "WIN1254"       );
+      rubyEncodingToPostgresEncoding.put("Windows-1255",  "WIN1255"       );
+      rubyEncodingToPostgresEncoding.put("Windows-1256",  "WIN1256"       );
+      rubyEncodingToPostgresEncoding.put("Windows-1257",  "WIN1257"       );
+      rubyEncodingToPostgresEncoding.put("Windows-1258",  "WIN1258"       );
     }
 
     public Connection(Ruby ruby, RubyClass rubyClass) {
         super(ruby, rubyClass);
-
-        encoding = null;
     }
 
     public static void define(Ruby ruby, RubyModule pg, RubyModule constants) {
@@ -352,8 +392,6 @@ public class Connection extends RubyObject {
 
     @JRubyMethod(rest = true, required = 1)
     public IRubyObject initialize(ThreadContext context, IRubyObject[] args) {
-        this.rubyEncoding = context.nil;
-
         Properties props = parse_args(context, args);
 
         // to make testing possible
@@ -380,7 +418,7 @@ public class Connection extends RubyObject {
         ConnectionState state = postgresqlConnection.connectPoll();
         return context.runtime.newFixnum(state.ordinal());
       } catch (Exception e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -388,11 +426,11 @@ public class Connection extends RubyObject {
     public IRubyObject finish(ThreadContext context) {
       try {
         if (postgresqlConnection.closed())
-          throw newPgError(context, "connection is closed", null, encoding);
+          throw newPgError(context, "connection is closed", null, getClientEncodingAsJavaEncoding(context));
         postgresqlConnection.close();
         return context.nil;
       } catch (Exception e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -515,7 +553,7 @@ public class Connection extends RubyObject {
 
     @JRubyMethod(alias = {"query", "async_exec", "async_query"}, required = 1, optional = 2)
     public IRubyObject exec(ThreadContext context, IRubyObject[] args, Block block) {
-        String query = args[0].convertToString().toString();
+        PostgresqlString query = rubyStringAsPostgresqlString(args[0]);
         ResultSet set = null;
         try {
             if (args.length == 1) {
@@ -531,17 +569,12 @@ public class Connection extends RubyObject {
               set = postgresqlConnection.execQueryParams(query, values, resultFormat, oids);
             }
 
-            Matcher matcher = ENCODING_PATTERN.matcher(query);
-            if (matcher.matches()) {
-              internal_encoding_set(context, context.runtime.newString(matcher.group(1)));
-            }
-
             if (set == null)
               return context.nil;
         } catch (PostgresqlException e) {
-          throw newPgError(context, e.getLocalizedMessage(), e.getResultSet(), encoding);
+          throw newPgError(context, e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
         } catch (Exception sqle) {
-            throw newPgError(context, sqle.getLocalizedMessage(), null, encoding);
+            throw newPgError(context, sqle.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
         }
 
         return createResult(context, set, args, block);
@@ -593,7 +626,7 @@ public class Connection extends RubyObject {
       if (args.length == 3)
         binary = ((RubyFixnum) args[2]).getLongValue() == FORMAT_BINARY;
 
-      Result result = new Result(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::Result"), this, set, encoding, binary);
+      Result result = new Result(context.runtime, (RubyClass)context.runtime.getClassFromPath("PG::Result"), this, set, getClientEncodingAsJavaEncoding(context), binary);
       if (block.isGiven())
         return block.call(context, result);
       return result;
@@ -602,8 +635,8 @@ public class Connection extends RubyObject {
     @JRubyMethod(required = 2, rest = true)
     public IRubyObject prepare(ThreadContext context, IRubyObject[] args) {
       try {
-        String name = args[0].asJavaString();
-        String query = args[1].asJavaString();
+        PostgresqlString name = rubyStringAsPostgresqlString(args[0]);
+        PostgresqlString query = rubyStringAsPostgresqlString(args[1]);
         int [] oids = null;
         if (args.length == 3) {
           RubyArray array = ((RubyArray) args[2]);
@@ -615,9 +648,9 @@ public class Connection extends RubyObject {
         ResultSet result = postgresqlConnection.prepare(name, query, oids);
         return createResult(context, result, NULL_ARRAY, Block.NULL_BLOCK);
       } catch (PostgresqlException e) {
-        throw newPgError(context, e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       } catch (Exception e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -627,14 +660,14 @@ public class Connection extends RubyObject {
         ResultSet set = execPreparedCommon(context, args, false);
         return createResult(context, set, args, block);
       } catch (PostgresqlException e) {
-        throw newPgError(context, e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       } catch (Exception e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
     private ResultSet execPreparedCommon(ThreadContext context, IRubyObject[] args, boolean async) throws IOException, PostgresqlException {
-      String queryName = args[0].asJavaString();
+      PostgresqlString queryName = rubyStringAsPostgresqlString(args[0]);
       Value[] values;
       int[] oids;
       if (args.length > 1) {
@@ -656,25 +689,26 @@ public class Connection extends RubyObject {
     @JRubyMethod(required = 1)
     public IRubyObject describe_prepared(ThreadContext context, IRubyObject query_name) {
       try {
-        ResultSet resultSet = postgresqlConnection.describePrepared(query_name.asJavaString());
+        PostgresqlString queryName = rubyStringAsPostgresqlString(query_name);
+        ResultSet resultSet = postgresqlConnection.describePrepared(queryName);
         return createResult(context, resultSet, NULL_ARRAY, Block.NULL_BLOCK);
       } catch (PostgresqlException e) {
-        throw newPgError(context, e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       } catch (Exception e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
     @JRubyMethod(required = 1)
     public IRubyObject describe_portal(ThreadContext context, IRubyObject arg0) {
       try {
-        String name = arg0.asJavaString();
+        PostgresqlString name = rubyStringAsPostgresqlString(arg0);
         ResultSet resultSet = postgresqlConnection.describePortal(name);
         return createResult(context, resultSet, NULL_ARRAY, Block.NULL_BLOCK);
       } catch (PostgresqlException e) {
-        throw newPgError(context, e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       } catch (Exception e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -689,12 +723,12 @@ public class Connection extends RubyObject {
       byte[] bytes = str.getBytes();
       int i;
       for (i = 0; i < bytes.length && bytes[i] != '\0'; i++);
-      return escapeBytes(context, bytes, 0, i, rubyEncoding, postgresqlConnection.getStandardConformingStrings());
+      return escapeBytes(context, bytes, 0, i, internal_encoding(context), postgresqlConnection.getStandardConformingStrings());
     }
 
     @JRubyMethod
     public IRubyObject escape_bytea(ThreadContext context, IRubyObject array) {
-      return escapeBytes(context, array, rubyEncoding, postgresqlConnection.getStandardConformingStrings());
+      return escapeBytes(context, array, internal_encoding(context), postgresqlConnection.getStandardConformingStrings());
     }
 
     @JRubyMethod
@@ -708,11 +742,11 @@ public class Connection extends RubyObject {
     public IRubyObject send_query(ThreadContext context, IRubyObject[] args) {
       try {
         if (args.length == 1) {
-          String query = args[0].asJavaString();
+          PostgresqlString query = rubyStringAsPostgresqlString(args[0]);
           postgresqlConnection.sendQuery(query);
         }
       } catch (Exception e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
       return context.nil;
     }
@@ -728,9 +762,9 @@ public class Connection extends RubyObject {
         execPreparedCommon(context, args, true);
         return context.nil;
       } catch (PostgresqlException e) {
-        throw newPgError(context, e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       } catch (Exception e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -750,7 +784,7 @@ public class Connection extends RubyObject {
         ResultSet set = postgresqlConnection.getResult();
         return createResult(context, set, NULL_ARRAY, block);
       } catch (Exception e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -760,7 +794,7 @@ public class Connection extends RubyObject {
         postgresqlConnection.consumeInput();
         return context.nil;
       } catch (IOException e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -787,7 +821,7 @@ public class Connection extends RubyObject {
       try {
         return context.runtime.newBoolean(postgresqlConnection.flush());
       } catch (Exception e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -798,7 +832,7 @@ public class Connection extends RubyObject {
       try {
         postgresqlConnection.cancel();
       } catch (Exception e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
       return context.nil;
     }
@@ -832,7 +866,7 @@ public class Connection extends RubyObject {
         ByteBuffer data = ByteBuffer.wrap(bytes);
         return context.runtime.newBoolean(postgresqlConnection.putCopyData(data));
       } catch (IOException e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -841,7 +875,7 @@ public class Connection extends RubyObject {
       try {
         return context.runtime.newBoolean(postgresqlConnection.putCopyDone());
       } catch (IOException e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -859,7 +893,7 @@ public class Connection extends RubyObject {
         ByteBuffer value = data.getValue();
         return context.runtime.newString(new ByteList(value.array(), value.arrayOffset() + value.position(), value.remaining()));
       } catch (IOException e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -901,14 +935,14 @@ public class Connection extends RubyObject {
 
       try {
         try {
-          postgresqlConnection.exec("BEGIN");
+          postgresqlConnection.exec(BEGIN_QUERY);
           if (block.arity() == Arity.NO_ARGUMENTS)
             block.yieldSpecific(context);
           else
             block.yieldSpecific(context, this);
-          postgresqlConnection.exec("COMMIT");
+          postgresqlConnection.exec(COMMIT_QUERY);
         } catch (RuntimeException ex) {
-          postgresqlConnection.exec("ROLLBACK");
+          postgresqlConnection.exec(ROLLBACK_QUERY);
           throw ex;
         }
       } catch (Exception e) {
@@ -929,7 +963,7 @@ public class Connection extends RubyObject {
         }
         return context.nil;
       } catch (Exception e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -955,7 +989,7 @@ public class Connection extends RubyObject {
           return context.runtime.newString(notification.getCondition());
         }
       } catch (IOException e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -970,7 +1004,7 @@ public class Connection extends RubyObject {
         ResultSet set = postgresqlConnection.getLastResult();
         return createResult(context, set, NULL_ARRAY, Block.NULL_BLOCK);
       } catch (Exception e) {
-        throw newPgError(context, e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -987,9 +1021,9 @@ public class Connection extends RubyObject {
           oid = manager.loCreat(0);
         return new RubyFixnum(context.runtime, oid);
       } catch (PostgresqlException e) {
-        throw newPgError(context, "lo_create failed: " + e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, "lo_create failed: " + e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       } catch (IOException e) {
-        throw newPgError(context, "lo_create failed: " + e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, "lo_create failed: " + e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -1000,9 +1034,9 @@ public class Connection extends RubyObject {
         int oid = manager.loCreate((Integer) arg0.toJava(Integer.class));
         return new RubyFixnum(context.runtime, oid);
       } catch (PostgresqlException e) {
-        throw newPgError(context, "lo_create failed: " + e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, "lo_create failed: " + e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       } catch (IOException e) {
-        throw newPgError(context, "lo_create failed: " + e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, "lo_create failed: " + e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -1028,9 +1062,9 @@ public class Connection extends RubyObject {
 
         return context.runtime.newFixnum(fd);
       } catch (IOException e) {
-        throw newPgError(context, "lo_open failed: " + e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, "lo_open failed: " + e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       } catch (PostgresqlException e) {
-        throw newPgError(context, "lo_open failed: " + e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, "lo_open failed: " + e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -1042,9 +1076,9 @@ public class Connection extends RubyObject {
         int count = postgresqlConnection.getLargeObjectAPI().loWrite((int) fd, bufferString.getBytes());
         return context.runtime.newFixnum(count);
       } catch (IOException e) {
-        throw newPgError(context, "lo_write failed: " + e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, "lo_write failed: " + e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       } catch (PostgresqlException e) {
-        throw newPgError(context, "lo_write failed: " + e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, "lo_write failed: " + e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -1058,9 +1092,9 @@ public class Connection extends RubyObject {
           return context.nil;
         return context.runtime.newString(new ByteList(b));
       } catch (PostgresqlException e) {
-        throw newPgError(context, "lo_read failed: " + e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, "lo_read failed: " + e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       } catch (IOException e) {
-        throw newPgError(context, "lo_read failed: " + e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, "lo_read failed: " + e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -1074,9 +1108,9 @@ public class Connection extends RubyObject {
         int where = postgresqlConnection.getLargeObjectAPI().loSeek(fd, offset, whence);
         return new RubyFixnum(context.runtime, where);
       } catch (IOException e) {
-        throw newPgError(context, "lo_lseek failed: " + e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, "lo_lseek failed: " + e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       } catch (PostgresqlException e) {
-        throw newPgError(context, "lo_lseek failed: " + e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, "lo_lseek failed: " + e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -1087,9 +1121,9 @@ public class Connection extends RubyObject {
         int where = postgresqlConnection.getLargeObjectAPI().loTell(fd);
         return context.runtime.newFixnum(where);
       } catch (IOException e) {
-        throw newPgError(context, "lo_tell failed: " + e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, "lo_tell failed: " + e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       } catch (PostgresqlException e) {
-        throw newPgError(context, "lo_tell failed: " + e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, "lo_tell failed: " + e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -1101,9 +1135,9 @@ public class Connection extends RubyObject {
         int value = postgresqlConnection.getLargeObjectAPI().loTruncate(fd, len);
         return context.runtime.newFixnum(value);
       } catch (PostgresqlException e) {
-        throw newPgError(context, "lo_tell failed: " + e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, "lo_tell failed: " + e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       } catch (IOException e) {
-        throw newPgError(context, "lo_tell failed: " + e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, "lo_tell failed: " + e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -1114,9 +1148,9 @@ public class Connection extends RubyObject {
         int value = postgresqlConnection.getLargeObjectAPI().loClose(fd);
         return context.runtime.newFixnum(value);
       } catch (IOException e) {
-        throw newPgError(context, "lo_close failed: " + e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, "lo_close failed: " + e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       } catch (PostgresqlException e) {
-        throw newPgError(context, "lo_close failed: " + e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, "lo_close failed: " + e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       }
     }
 
@@ -1127,64 +1161,102 @@ public class Connection extends RubyObject {
         int value = postgresqlConnection.getLargeObjectAPI().loUnlink(fd);
         return context.runtime.newFixnum(value);
       } catch (IOException e) {
-        throw newPgError(context, "lo_unlink failed: " + e.getLocalizedMessage(), null, encoding);
+        throw newPgError(context, "lo_unlink failed: " + e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
       } catch (PostgresqlException e) {
-        throw newPgError(context, "lo_unlink failed: " + e.getLocalizedMessage(), e.getResultSet(), encoding);
+        throw newPgError(context, "lo_unlink failed: " + e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
       }
     }
 
     /******     M17N     ******/
 
-    @JRubyMethod(alias = {"client_encoding"})
-    public IRubyObject internal_encoding(ThreadContext context) {
-      return rubyEncoding;
+    @JRubyMethod
+    public IRubyObject get_client_encoding(ThreadContext context) {
+      return context.runtime.newString(postgresqlConnection.getClientEncoding());
     }
 
-    @JRubyMethod(name = {"internal_encoding=", "set_client_encoding", "client_encoding=" }, required = 1)
-    public IRubyObject internal_encoding_set(ThreadContext context, IRubyObject encoding) {
-      IRubyObject rubyEncoding = context.nil;
-      if (encoding instanceof RubyString) {
-        rubyEncoding = findEncoding(context, encoding);
-      } else if (encoding instanceof RubyEncoding) {
-        rubyEncoding = encoding;
-      }
+    @JRubyMethod(required = 1, alias = {"client_encoding="})
+    public IRubyObject set_client_encoding(ThreadContext context, IRubyObject encoding) {
+      return setClientEncodingCommon(context, encoding.asJavaString());
+    }
 
-      if (!rubyEncoding.isNil()) {
-        this.encoding = ((RubyEncoding) rubyEncoding).getEncoding();
-        this.rubyEncoding = rubyEncoding;
-      }
+    @JRubyMethod
+    public IRubyObject internal_encoding(ThreadContext context) {
+      String encoding = postgresqlConnection.getClientEncoding();
+      return findEncoding(context, postgresEncodingToRubyEncoding.get(encoding));
+    }
 
-      return rubyEncoding;
+    @JRubyMethod(name = "internal_encoding=")
+    public IRubyObject set_internal_encoding(ThreadContext context, IRubyObject encoding) {
+      try {
+        String postgresEncoding;
+        if (encoding instanceof RubyString) {
+          postgresEncoding = encoding.asJavaString();
+        } else if (encoding instanceof RubyEncoding) {
+          postgresEncoding = ((RubyEncoding) encoding).to_s(context).asJavaString();
+        } else {
+          postgresEncoding = "SQL_ASCII";
+        }
+        if (rubyEncodingToPostgresEncoding.containsKey(postgresEncoding))
+            postgresEncoding = rubyEncodingToPostgresEncoding.get(postgresEncoding);
+        postgresqlConnection.setClientEncoding(postgresEncoding);
+        return context.nil;
+      } catch (IOException e) {
+        throw newPgError(context, e.getLocalizedMessage(), null, getClientEncodingAsJavaEncoding(context));
+      } catch (PostgresqlException e) {
+        throw newPgError(context, e.getLocalizedMessage(), e.getResultSet(), getClientEncodingAsJavaEncoding(context));
+      }
     }
 
     @JRubyMethod
     public IRubyObject external_encoding(ThreadContext context) {
-      return context.nil;
+      String encoding = postgresqlConnection.getServerEncoding();
+      return findEncoding(context, postgresEncodingToRubyEncoding.get(encoding));
     }
 
     @JRubyMethod
     public IRubyObject set_default_encoding(ThreadContext context) {
-      IRubyObject internal_encoding = RubyEncoding.getDefaultInternal(this);
-      if (!internal_encoding.isNil()) {
-        return internal_encoding_set(context, internal_encoding);
+      IRubyObject _internal_encoding = RubyEncoding.getDefaultInternal(this);
+      if (_internal_encoding.isNil())
+        return context.nil;
+      return set_internal_encoding(context, _internal_encoding);
+    }
+
+    private PostgresqlString rubyStringAsPostgresqlString(IRubyObject str) {
+      return new PostgresqlString(((RubyString) str).getBytes());
+    }
+
+    private IRubyObject setClientEncodingCommon(ThreadContext context, String encoding) {
+      try {
+        postgresqlConnection.setClientEncoding(encoding);
+        return context.nil;
+      } catch (IOException e) {
+        throw newPgError(context, e.getLocalizedMessage(), null, this.getClientEncodingAsJavaEncoding(context));
+      } catch (PostgresqlException e) {
+        throw newPgError(context, e.getLocalizedMessage(), e.getResultSet(), this.getClientEncodingAsJavaEncoding(context));
       }
-      return internal_encoding;
+    }
+
+    private Encoding getClientEncodingAsJavaEncoding(ThreadContext context) {
+      IRubyObject encoding = internal_encoding(context);
+      if (encoding.isNil())
+        return null;
+      return ((RubyEncoding) encoding).getEncoding();
     }
 
     private IRubyObject findEncoding(ThreadContext context, String encodingName) {
-      return findEncoding(context, context.runtime.newString(encodingName));
+      IRubyObject rubyEncodingName = encodingName == null ? context.nil : context.runtime.newString(encodingName);
+      return findEncoding(context, rubyEncodingName);
     }
 
     private IRubyObject findEncoding(ThreadContext context, IRubyObject encodingName) {
+      IRubyObject encoding = context.nil;
       try {
-        String javaName = encodingName.asJavaString().toUpperCase();
-        if (postgresEncodingToRubyEncoding.containsKey(javaName)) {
-          String rubyName = postgresEncodingToRubyEncoding.get(javaName);
-          return findEncoding(context, rubyName);
-        }
-        return context.runtime.getClass("Encoding").callMethod("find", encodingName);
+        if (!encodingName.isNil())
+          encoding = context.runtime.getClass("Encoding").callMethod("find", encodingName);
       } catch (RuntimeException e) {
-        return context.runtime.getClass("Encoding").getConstant("ASCII_8BIT");
       }
+      if (encoding.isNil())
+        encoding = context.runtime.getClass("Encoding").getConstant("ASCII_8BIT");
+      return encoding;
     }
 }

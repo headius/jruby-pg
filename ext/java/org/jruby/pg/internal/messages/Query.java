@@ -3,11 +3,13 @@ package org.jruby.pg.internal.messages;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 
+import org.jruby.pg.internal.PostgresqlString;
+
 public class Query extends ProtocolMessage {
-  private final String query;
+  private final PostgresqlString query;
   private final byte[] bytes;
 
-  public Query(String query) {
+  public Query(PostgresqlString query) {
     this.query = query;
 
     ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -37,7 +39,7 @@ public class Query extends ProtocolMessage {
     return ByteBuffer.wrap(bytes);
   }
 
-  public String getQuery() {
+  public PostgresqlString getQuery() {
     return query;
   }
 }

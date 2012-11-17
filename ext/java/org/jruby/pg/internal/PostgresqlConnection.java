@@ -130,14 +130,14 @@ public class PostgresqlConnection {
     return state.pollingState();
   }
 
-  public ResultSet exec(String query) throws IOException, PostgresqlException {
+  public ResultSet exec(PostgresqlString query) throws IOException, PostgresqlException {
     // ignore any prior results
     getLastResult();
     sendQuery(query);
     return getLastResultThrowError();
   }
 
-  public ResultSet execQueryParams(String query, Value[] values, Format format, int[] oids) throws IOException,
+  public ResultSet execQueryParams(PostgresqlString query, Value[] values, Format format, int[] oids) throws IOException,
       PostgresqlException {
     // ignore any prior results
     getLastResult();
@@ -145,41 +145,41 @@ public class PostgresqlConnection {
     return getLastResultThrowError();
   }
 
-  public ResultSet execPrepared(String name, Value[] values, Format format) throws IOException, PostgresqlException {
+  public ResultSet execPrepared(PostgresqlString name, Value[] values, Format format) throws IOException, PostgresqlException {
     // ignore any prior results
     getLastResult();
     sendExecPrepared(name, values, format);
     return getLastResultThrowError();
   }
 
-  public ResultSet prepare(String name, String query, int[] oids) throws IOException, PostgresqlException {
+  public ResultSet prepare(PostgresqlString name, PostgresqlString query, int[] oids) throws IOException, PostgresqlException {
     // ignore any prior results
     getLastResult();
     sendPrepareQuery(name, query, oids);
     return getLastResultThrowError();
   }
 
-  public ResultSet describePrepared(String name) throws IOException, PostgresqlException {
+  public ResultSet describePrepared(PostgresqlString name) throws IOException, PostgresqlException {
     sendDescribePrepared(name);
     return getLastResultThrowError();
   }
 
-  public ResultSet describePortal(String name) throws IOException, PostgresqlException {
+  public ResultSet describePortal(PostgresqlString name) throws IOException, PostgresqlException {
     sendDescribePortal(name);
     return getLastResultThrowError();
   }
 
-  public void sendQueryParams(String query, Value[] values, Format format, int[] oids) throws IOException {
-    sendPrepareQuery("", query, oids);
+  public void sendQueryParams(PostgresqlString query, Value[] values, Format format, int[] oids) throws IOException {
+    sendPrepareQuery(PostgresqlString.NULL_STRING, query, oids);
     shouldBind = true;
     // storing the binding info for later
     this.values = values;
     this.format = format;
   }
 
-  public void sendExecPrepared(String name, Value[] values, Format format) throws IOException {
+  public void sendExecPrepared(PostgresqlString name, Value[] values, Format format) throws IOException {
     checkIsReady();
-    currentOutBuffer = new Bind("", name, values, format).toBytes();
+    currentOutBuffer = new Bind(PostgresqlString.NULL_STRING, name, values, format).toBytes();
     shouldDescribe = true;
     shouldExecute = true;
     state = ConnectionState.SendingBind;
@@ -191,7 +191,7 @@ public class PostgresqlConnection {
     changeState();
   }
 
-  public void sendExecutePortal(String name) throws IOException {
+  public void sendExecutePortal(PostgresqlString name) throws IOException {
     checkIsReady();
     currentOutBuffer = new Execute(name).toBytes();
     state = ConnectionState.SendingExecute;
@@ -203,19 +203,19 @@ public class PostgresqlConnection {
     changeState();
   }
 
-  public void sendDescribePortal(String name) throws IOException {
+  public void sendDescribePortal(PostgresqlString name) throws IOException {
     checkIsReady();
     Describe message = new Describe(name, StatementType.Portal);
     sendDescribeCommon(message);
   }
 
-  public void sendDescribePrepared(String name) throws IOException {
+  public void sendDescribePrepared(PostgresqlString name) throws IOException {
     checkIsReady();
     Describe message = new Describe(name, StatementType.Prepared);
     sendDescribeCommon(message);
   }
 
-  public void sendQuery(String query) throws IOException {
+  public void sendQuery(PostgresqlString query) throws IOException {
     checkIsReady();
     currentOutBuffer = new Query(query).toBytes();
     state = ConnectionState.SendingQuery;
@@ -227,7 +227,7 @@ public class PostgresqlConnection {
     changeState();
   }
 
-  public void sendPrepareQuery(String name, String query, int[] oids) throws IOException {
+  public void sendPrepareQuery(PostgresqlString name, PostgresqlString query, int[] oids) throws IOException {
     checkIsReady();
     currentOutBuffer = new Parse(name, query, oids).toBytes();
     state = ConnectionState.SendingParse;
@@ -388,6 +388,22 @@ public class PostgresqlConnection {
     if (value == null || !value.equals("on"))
       return false;
     return true;
+  }
+
+  public String getClientEncoding() {
+    return parameterValues.get("client_encoding");
+  }
+
+  public void setClientEncoding(String encoding) throws IOException, PostgresqlException {
+    try {
+      exec(new PostgresqlString("SET client_encoding TO '" + encoding + "'"));
+    } catch (PostgresqlException ex) {
+      throw new PostgresqlException("Invalid encoding: " + encoding, ex.getResultSet());
+    }
+  }
+
+  public String getServerEncoding() {
+    return parameterValues.get("server_encoding");
   }
 
   public boolean putCopyDone() throws IOException {
@@ -603,13 +619,13 @@ public class PostgresqlConnection {
       } else {
         if (shouldBind) {
           shouldBind = false;
-          sendExecPrepared("", values, format);
+          sendExecPrepared(PostgresqlString.NULL_STRING, values, format);
         } else if (shouldDescribe) {
           shouldDescribe = false;
-          sendDescribePortal("");
+          sendDescribePortal(PostgresqlString.NULL_STRING);
         } else if (shouldExecute) {
           shouldExecute = false;
-          sendExecutePortal("");
+          sendExecutePortal(PostgresqlString.NULL_STRING);
         }
       }
     }
