@@ -83,6 +83,13 @@ describe PG::Connection do
       res.getvalue( 0, 0 ).should be_nil
     end
 
+    it 'returns an empty array when fields is called after an CREATE/DROP query' do
+      res = @conn.exec 'CREATE TABLE FOO (BAR INT)'
+      res.fields.should == []
+      res = @conn.exec 'DROP TABLE FOO'
+      res.fields.should == []
+    end
+
     it 'returns an empty result set when an INSERT is executed' do
       res = @conn.exec 'CREATE TABLE foo (bar INT)'
       res.should_not be_nil

@@ -260,7 +260,7 @@ public class Result extends RubyObject {
     public IRubyObject fields(ThreadContext context) {
       RowDescription description = jdbcResultSet.getDescription();
       if (description == null)
-        return context.nil;
+        return context.runtime.newArray();
       Column[] columns = description.getColumns();
       RubyArray fields = context.runtime.newArray(columns.length);
       for (int i = 0; i < columns.length; i++)
