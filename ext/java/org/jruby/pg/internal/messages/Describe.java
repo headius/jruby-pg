@@ -3,14 +3,15 @@ package org.jruby.pg.internal.messages;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 
+import org.jruby.pg.internal.PostgresqlString;
 import org.jruby.pg.internal.messages.Close.StatementType;
 
 public class Describe extends ProtocolMessage {
-  private final String name;
+  private final PostgresqlString name;
   private final StatementType statementType;
   private final byte[] bytes;
 
-  public Describe(String name, StatementType statementType) {
+  public Describe(PostgresqlString name, StatementType statementType) {
     this.name = name;
     this.statementType = statementType;
 
@@ -49,7 +50,7 @@ public class Describe extends ProtocolMessage {
     return ByteBuffer.wrap(bytes);
   }
 
-  public String getName() {
+  public PostgresqlString getName() {
     return name;
   }
 

@@ -10,7 +10,7 @@ public class Execute extends ProtocolMessage {
   private final byte[] bytes;
   private final int length;
 
-  public Execute(String name) {
+  public Execute(PostgresqlString name) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     try {
       out.write('E');

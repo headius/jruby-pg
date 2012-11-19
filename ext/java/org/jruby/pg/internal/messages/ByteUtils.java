@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
+import org.jruby.pg.internal.PostgresqlString;
+
 public class ByteUtils {
   public static void writeInt4(OutputStream out, int value) throws IOException {
     out.write(value >> 24);
@@ -54,6 +56,11 @@ public class ByteUtils {
   }
 
   public static void writeString(OutputStream out, String name) throws IOException {
+    out.write(name.getBytes());
+    out.write('\0');
+  }
+
+  public static void writeString(OutputStream out, PostgresqlString name) throws IOException {
     out.write(name.getBytes());
     out.write('\0');
   }

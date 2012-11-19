@@ -38,6 +38,7 @@ and We'll be happy to fix them.
 * We currently have some failing tests when we run the activerecord test suite.
 * Profiling the library would be awesome, but will try to get it running first
   then optimize.
+* JRuby 1.6.x (1.8 mode) needs to be tested.
 
 == REQUIREMENTS:
 

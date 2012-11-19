@@ -40,13 +40,6 @@ Rake::JavaExtensionTask.new("pg_ext", HOE.spec) do |ext|
   ext.classpath = jars.map { |x| File.expand_path x }.join ':'
 end
 
-gem_build_path = File.join 'pkg', HOE.spec.full_name
-
-task gem_build_path => [:compile] do
-  cp 'lib/pg_ext.jar', File.join(gem_build_path, 'lib')
-  HOE.spec.files += ['lib/pg_ext.jar']
-end
-
 def remote
   "git://github.com/jvshahid/ruby-pg.git"
 end
