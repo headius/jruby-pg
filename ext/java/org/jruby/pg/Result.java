@@ -219,7 +219,7 @@ public class Result extends RubyObject {
 
     @JRubyMethod(name = {"cmd_tuples", "cmdtuples"})
     public IRubyObject cmd_tuples(ThreadContext context) {
-        return context.nil;
+    	return context.runtime.newFixnum(jdbcResultSet.getAffectedRows());
     }
 
     @JRubyMethod

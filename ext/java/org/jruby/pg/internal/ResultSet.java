@@ -26,6 +26,7 @@ public class ResultSet {
   private RowDescription descrption;
   private ParameterDescription parameterDescription;
   private final List<DataRow> rows = new ArrayList<DataRow>();
+  private int affectedRows;
   private ErrorResponse error;
 
   public void setDescription(RowDescription descrption) {
@@ -78,7 +79,15 @@ public class ResultSet {
     this.parameterDescription = parameterDescription;
   }
 
-  public boolean hasError() {
+  public int getAffectedRows() {
+	return affectedRows;
+}
+
+public void setAffectedRows(int affectedRows) {
+	this.affectedRows = affectedRows;
+}
+
+public boolean hasError() {
     return error != null;
   }
 }

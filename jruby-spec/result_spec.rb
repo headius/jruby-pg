@@ -11,6 +11,15 @@ describe PG::Result do
     teardown_testing_db( @conn )
   end
 
+  it 'returns the number of rows affected by INSERT and DELETE' do
+    @conn.exec 'CREATE TABLE FOO (BAR INT)'
+    res = @conn.exec 'INSERT INTO FOO VALUES (1)'
+    res.cmd_tuples.should == 1
+    @conn.exec 'INSERT INTO FOO VALUES (1)'
+    res = @conn.exec 'DELETE FROM FOO'
+    res.cmd_tuples.should == 2
+  end
+
   it 'nfields return the correct number of columns' do
     res = @conn.exec 'SELECT 1 as n'
     res.nfields.should== 1

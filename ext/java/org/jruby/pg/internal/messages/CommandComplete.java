@@ -20,7 +20,8 @@ public class CommandComplete extends BackendMessage {
       oid = matcher.group(2) == null ? -1 : Integer.parseInt(matcher.group(2).trim());
     } else {
       command = tag;
-      rows = oid = -1;
+      oid = -1;
+      rows = 0;
     }
   }
 

@@ -33,6 +33,7 @@ import org.jruby.pg.internal.messages.BackendKeyData;
 import org.jruby.pg.internal.messages.Bind;
 import org.jruby.pg.internal.messages.CancelRequest;
 import org.jruby.pg.internal.messages.Close.StatementType;
+import org.jruby.pg.internal.messages.CommandComplete;
 import org.jruby.pg.internal.messages.CopyData;
 import org.jruby.pg.internal.messages.CopyDone;
 import org.jruby.pg.internal.messages.DataRow;
@@ -776,6 +777,7 @@ public class PostgresqlConnection {
     case CommandComplete:
       if (inProgress == null)
         inProgress = new ResultSet();
+      inProgress.setAffectedRows(((CommandComplete) message).getRows()); 
       lastResultSet.add(inProgress);
       inProgress = null;
       break;
