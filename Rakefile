@@ -72,7 +72,8 @@ Dir.chdir 'jruby-spec' do
       if File.directory? file_name
         FileUtils.mkpath new_name
       else
-        FileUtils.chmod 0644, new_name
+        puts "copying #{file_name} to #{new_name}, pwd: #{Dir.pwd}"
+        FileUtils.chmod 0644, new_name if File.exist?(new_name)
         FileUtils.cp file_name, new_name
         File.chmod 0444, new_name
       end
