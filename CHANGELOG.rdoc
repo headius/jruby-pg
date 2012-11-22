@@ -2,5 +2,5 @@
 
 * BUG
   * Prepared statements that don't return results hung
-  * Result.getvalue dies on NULL value
-
+  * Result::getvalue dies on NULL value
+  * Result::cmd_tuples should return the number of affected rows
