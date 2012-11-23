@@ -14,6 +14,26 @@ if [ ! $? ]; then
     exit 1
 fi
 
+# clone my json branch that has a fix for the merge problem
+json_dir=tmp_json
+if [ ! -d $json_dir ]; then
+    if ! git clone git://github.com/jvshahid/json.git $json_dir ; then
+        echo "Cannot clone json from ${json_dir}"
+        exit 1
+    fi
+fi
+pushd $json_dir
+git checkout fix_merge
+rvm use --create jruby@json
+bundle install
+rake jruby_gem
+rake package
+popd
+echo "$json_dir/pkg"
+ls $json_dir/pkg
+json_gem=$(readlink -f $json_dir/pkg/json-1.7.5-java.gem)
+json_pure_gem=$(readlink -f $json_dir/pkg/json_pure-1.7.5.gem)
+
 # Run rails test suite
 rails_dir=tmp_rails
 if [ ! -d $rails_dir ]; then
@@ -43,6 +63,8 @@ source ~/.rvm/scripts/rvm
 rvm use --create jruby@rails-test-jruby-pg
 gem uninstall pg -a -x
 gem install $pg_pkg
+gem install $json_gem
+gem install $json_pure_gem
 gem install bundler
 bundle install
 pushd activerecord
