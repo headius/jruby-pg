@@ -6,7 +6,9 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
@@ -46,6 +48,8 @@ import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
 
 public class Connection extends RubyObject {
+  private final static String[]            POSITIONAL_ARGS                = {
+      "host", "port", "options", "tty", "dbname", "user", "password"     };
     private final static Map<String, String> postgresEncodingToRubyEncoding = new HashMap<String, String>();
     private final static Map<String, String> rubyEncodingToPostgresEncoding = new HashMap<String, String>();
     protected final static int FORMAT_TEXT = 0;
@@ -325,46 +329,37 @@ public class Connection extends RubyObject {
     private static Properties parse_args(ThreadContext context, IRubyObject[] args) {
       if (args.length > 7)
         throw context.getRuntime().newArgumentError("extra positional parameter");
+    if (args.length != 7 && args.length != 1)
+      throw context.getRuntime().newArgumentError(
+          "Wrong number of arguments, see the documentation");
 
       Properties argumentsHash = new Properties();
 
-      int last_index = 0;
-      // handle a hash argument first
-      if (args.length >= 1 && args[0] instanceof RubyHash) {
-        last_index = 1;
-        RubyHash hash = (RubyHash)args[0];
+      if (args.length == 1) {
+        // we have a string or hash
+        if (args[0] instanceof RubyHash) {
+          RubyHash hash = (RubyHash)args[0];
 
-        for (Object _entry : hash.entrySet()) {
-          Entry<String, Object> entry = (Entry<String, Object>) _entry;
-          argumentsHash.put(PostgresHelpers.stringify(entry.getKey()), PostgresHelpers.stringify(entry.getValue()));
+          for (Object _entry : hash.entrySet()) {
+            Entry<String, Object> entry = (Entry<String, Object>) _entry;
+            argumentsHash.put(PostgresHelpers.stringify(entry.getKey()), PostgresHelpers.stringify(entry.getValue()));
+          }
+        } else if (args[0] instanceof RubyString) {
+        String[] tokens = tokenizeString(args[0].asJavaString());
+        if (tokens.length % 2 != 0)
+          throw context.runtime.newArgumentError("wrong connection string");
+        for (int i = 0; i < tokens.length; i += 2)
+          argumentsHash.put(tokens[i], tokens[i + 1]);
+        } else {
+          throw context.runtime.newArgumentError("Wrong type/number of arguments, see the documentation");
         }
-      }
-
-      if (args.length == last_index + 1) {
-        // handle a string argument
-        // we have a connection string, parse it
-        String connectionString = args[0].asJavaString();
-        String[] options = connectionString.split(" ");
-        for (String option : options) {
-          String[] keyValuePair = option.split("=");
-          if (keyValuePair.length != 2)
-            throw context.runtime.newRuntimeError("Connection string doesn't have the right format");
-          argumentsHash.put(keyValuePair[0], keyValuePair[1]);
+      } else {
+        // we have positional parameters
+        for (int i = 0 ; i < POSITIONAL_ARGS.length ; i++) {
+          if (!args[i].isNil())
+          argumentsHash.put(POSITIONAL_ARGS[i], ((RubyObject) args[i]).to_s()
+              .asJavaString());
         }
-      } else if (args.length > last_index + 1) {
-        // assume positional arguments in the following order
-        // host, port, options, tty, dbname, user, password
-        argumentsHash.put("host", args[last_index].asJavaString());
-        if (args.length >= last_index + 1)
-          argumentsHash.put("port", ((RubyFixnum) args[last_index + 1]).to_s().toString());
-        // FIXME: what is the options argument ?
-        // FIXME: what is the tty argument ?
-        if (args.length >= last_index + 4 && !args[last_index + 4].isNil())
-          argumentsHash.put("dbname", args[last_index + 4].asJavaString());
-        if (args.length >= last_index + 5 && !args[last_index + 5].isNil())
-          argumentsHash.put("user", args[last_index + 5].asJavaString());
-        if (args.length >= last_index + 6 && !args[last_index + 6].isNil())
-          argumentsHash.put("password", args[last_index + 6].asJavaString());
       }
       return argumentsHash;
     }
@@ -1219,6 +1214,51 @@ public class Connection extends RubyObject {
       if (_internal_encoding.isNil())
         return context.nil;
       return set_internal_encoding(context, _internal_encoding);
+    }
+
+    private static String[] tokenizeString(String asJavaString) {
+      List<String> tokens = new ArrayList<String>();
+      StringBuffer currentToken = new StringBuffer();
+      boolean insideSingleQuote = false;
+      boolean escapeNextCharacter = false;
+      for (int i = 0; i < asJavaString.length(); i++) {
+        char currentChar = asJavaString.charAt(i);
+
+        // finish the current token and append it if:
+        //   - we just hit an equal sign or a space and we're not inside single quotes
+        //   - we just hit a single quote and we're inside a token
+        //   - we're at the end of the input string
+        if ((currentChar == '=' || Character.isWhitespace(currentChar)) && !insideSingleQuote ||
+            (currentChar == '\'' && !escapeNextCharacter && insideSingleQuote)) {
+          if (insideSingleQuote)
+            insideSingleQuote = false;
+          tokens.add(currentToken.toString());
+          currentToken = new StringBuffer();
+          // get rid of all the whitespaces and equal sign that follow
+          i = consumeWhiteSpaceAndEqual(asJavaString, i);
+        } else if (currentChar == '\\' && !escapeNextCharacter) {
+          escapeNextCharacter = true;
+        } else if (currentChar == '\'' && !escapeNextCharacter) {
+          // don't add the last single quote. we just started a new token
+          // surrounded by single quotes
+          insideSingleQuote = true;
+        } else {
+          escapeNextCharacter = false;
+          currentToken.append(currentChar);
+        }
+      }
+      if (currentToken.length() != 0)
+        tokens.add(currentToken.toString());
+      return tokens.toArray(new String[tokens.size()]);
+    }
+
+    private static int consumeWhiteSpaceAndEqual(String string, int currentIndex) {
+      for (int i = currentIndex + 1; i < string.length(); i++) {
+        char currentCharacter = string.charAt(i);
+        if (!Character.isWhitespace(currentCharacter) && currentCharacter != '=')
+          return i - 1;
+      }
+      return string.length();
     }
 
     private PostgresqlString rubyStringAsPostgresqlString(IRubyObject str) {

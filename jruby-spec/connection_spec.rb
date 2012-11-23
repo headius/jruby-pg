@@ -51,6 +51,12 @@ describe PG::Connection do
   end
 
   describe 'basic connection properties' do
+    it 'can sends the options to the server' do
+      conn = PG.connect "#{@conninfo} user=password password=secret options = '-c geqo=off'"
+      res = conn.query('show geqo')
+      res.getvalue(0, 0).should== 'off'
+    end
+
     it 'correctly translates the server version' do
       @conn.server_version.should >=(80200)
     end

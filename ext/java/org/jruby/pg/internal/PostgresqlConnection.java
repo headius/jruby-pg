@@ -2,6 +2,7 @@ package org.jruby.pg.internal;
 
 import static org.jruby.pg.internal.PostgresqlConnectionUtils.dbname;
 import static org.jruby.pg.internal.PostgresqlConnectionUtils.host;
+import static org.jruby.pg.internal.PostgresqlConnectionUtils.options;
 import static org.jruby.pg.internal.PostgresqlConnectionUtils.password;
 import static org.jruby.pg.internal.PostgresqlConnectionUtils.port;
 import static org.jruby.pg.internal.PostgresqlConnectionUtils.ssl;
@@ -516,6 +517,7 @@ public class PostgresqlConnection {
     this.host = host(props);
     this.port = port(props);
     this.user = user(props);
+    this.options = options(props);
     this.dbname = dbname(props);
     this.password = password(props);
     this.ssl = ssl(props);
@@ -580,7 +582,7 @@ public class PostgresqlConnection {
       // send startup message
       socket.configureBlocking(false);
       state = ConnectionState.SendingStartup;
-      currentOutBuffer = new Startup(user, dbname, new Properties()).toBytes();
+      currentOutBuffer = new Startup(user, dbname, options).toBytes();
       currentInMessage = new ProtocolMessageBuffer();
     } catch (IOException e) {
       state = ConnectionState.Failed;
@@ -777,7 +779,7 @@ public class PostgresqlConnection {
     case CommandComplete:
       if (inProgress == null)
         inProgress = new ResultSet();
-      inProgress.setAffectedRows(((CommandComplete) message).getRows()); 
+      inProgress.setAffectedRows(((CommandComplete) message).getRows());
       lastResultSet.add(inProgress);
       inProgress = null;
       break;
@@ -841,6 +843,7 @@ public class PostgresqlConnection {
   private final String                     dbname;
   private final int                        port;
   private final String                     user;
+  private final String options;
   private final String                     password;
   private final String                     ssl;
   private boolean                          nonBlocking     = false;

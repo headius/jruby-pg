@@ -2,13 +2,11 @@ package org.jruby.pg.internal.messages;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
-import java.util.Map.Entry;
-import java.util.Properties;
 
 public class Startup extends ProtocolMessage {
   private final byte[] bytes;
 
-  public Startup(String user, String database, Properties props) {
+  public Startup(String user, String database, String options) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     try {
       ByteUtils.writeInt4(out, 0);
@@ -18,10 +16,8 @@ public class Startup extends ProtocolMessage {
       ByteUtils.writeString(out, user);
       ByteUtils.writeString(out, "database");
       ByteUtils.writeString(out, database);
-      for (Entry<Object, Object> entry : props.entrySet()) {
-        ByteUtils.writeString(out, entry.getKey().toString());
-        ByteUtils.writeString(out, entry.getValue().toString());
-      }
+      ByteUtils.writeString(out, "options");
+      ByteUtils.writeString(out, options);
       out.write('\0');
     } catch (Exception e) {
       // we cannot be here

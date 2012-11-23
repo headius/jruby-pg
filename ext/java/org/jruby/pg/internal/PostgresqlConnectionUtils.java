@@ -15,6 +15,10 @@ public class PostgresqlConnectionUtils {
     return prop.getProperty("password", "");
   }
 
+  public static String options(Properties prop) {
+    return prop.getProperty("options", "");
+  }
+
   public static String ssl(Properties prop) {
     return prop.getProperty("ssl", "disable");
   }
