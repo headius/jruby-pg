@@ -62,6 +62,10 @@ use the following command to do that:
 
   $ sudo -u postgres createuser -s <insert your username here>
 
+You'll also need to add the following line in the your pg_hba.conf (in order to disable password authentication):
+
+  host    all             <insert your username here>        127.0.0.1/32            trust
+
 After checking out the source, run:
 
   $ rake
