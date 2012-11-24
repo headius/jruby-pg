@@ -712,7 +712,16 @@ public class Connection extends RubyObject {
       return createResult(context, new ResultSet(), NULL_ARRAY, Block.NULL_BLOCK);
     }
 
-    @JRubyMethod(alias = {"escape_string", "escape"}, required = 1, argTypes = {RubyString.class} )
+    @JRubyMethod(alias = "escape_string")
+    public IRubyObject escape(ThreadContext context, IRubyObject _str) {
+      RubyString str = (RubyString) _str;
+      byte[] bytes = str.getBytes();
+      bytes = postgresqlConnection.escapeString(new PostgresqlString(bytes)).getBytes();
+      RubyEncoding encoding = (RubyEncoding) internal_encoding(context);
+      return context.runtime.newString(new ByteList(bytes, encoding.getEncoding()));
+    }
+
+    @JRubyMethod(required = 1, argTypes = {RubyString.class} )
     public IRubyObject escape_literal_native(ThreadContext context, IRubyObject _str) {
       RubyString str = (RubyString) _str;
       byte[] bytes = str.getBytes();

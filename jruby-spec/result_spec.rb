@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 require 'rspec'
 require 'spec/lib/helpers'
 require 'pg'
@@ -5,6 +7,14 @@ require 'pg'
 describe PG::Result do
   before(:all) do
     @conn = setup_testing_db( "PG_Connection" )
+  end
+
+  before( :each ) do
+    @conn.exec( 'BEGIN' ) unless example.metadata[:without_transaction]
+  end
+
+  after( :each ) do
+    @conn.exec( 'ROLLBACK' ) unless example.metadata[:without_transaction]
   end
 
   after(:all) do
@@ -38,5 +48,17 @@ describe PG::Result do
   it 'returns the names of the fields in the result set' do
     res = @conn.exec "Select 1 as n"
     res.fields.should== ['n']
+  end
+
+  it 'returns newlines in text fields properly' do
+    value = "foo\nbar"
+    res = @conn.exec "VALUES ('#{@conn.escape value}')"
+    res.getvalue(0, 0).should== value
+  end
+
+  it 'escapes multibyte strings properly' do
+    value = 'いただきます！'
+    res = @conn.exec "VALUES ('#{@conn.escape value}')"
+    res.getvalue(0, 0).should== value
   end
 end

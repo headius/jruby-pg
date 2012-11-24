@@ -70,6 +70,8 @@ bundle install
 pushd activerecord
 PATH=$PATH:$(pg_config --bindir)
 bundle exec rake postgresql:rebuild_databases
+# A reminder: If you want to run a single file, use the following
+# rake postgresql:test TEST='test/cases/migration/column_attributes_test.rb'
 bundle exec rake postgresql:test
 popd
 popd
