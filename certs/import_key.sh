@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-if [ ! -f server.crt.der ]; then
-    ./generate_keys.sh
+cert_dir=$(readlink -f $(dirname $0))
+if [ ! -f $cert_dir/server.crt.der ]; then
+    $cert_dir/generate_keys.sh
 fi
 
 sudo keytool -storepass changeit \
@@ -13,4 +14,4 @@ sudo keytool -storepass changeit \
     -keystore $JAVA_HOME/jre/lib/security/cacerts \
     -alias postgresql \
     -noprompt \
-    -import -file server.crt.der
+    -import -file $cert_dir/server.crt.der

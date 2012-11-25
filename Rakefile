@@ -60,6 +60,12 @@ task :'sync-files' => 'get-ruby-pg-specs'
 Rake::Task[:spec].prerequisites << 'sync-files'
 Rake::Task[:spec].prerequisites << :compile
 Rake::Task[:spec].prerequisites << :java_debug
+Rake::Task[:spec].prerequisites << :import_certs
+
+desc "import server certificates"
+task :import_certs do
+  system 'certs/import_key.sh'
+end
 
 # sync specs from jruby-spec to spec/jruby
 target_dir = 'spec/jruby'
