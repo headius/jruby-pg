@@ -8,7 +8,7 @@ public class PostgresqlConnectionUtils {
   }
 
   public static String dbname(Properties prop) {
-    return prop.getProperty("dbname");
+    return prop.getProperty("dbname", user(prop));
   }
 
   public static String password(Properties prop) {

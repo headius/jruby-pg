@@ -327,13 +327,15 @@ public class Connection extends RubyObject {
 
     @SuppressWarnings("unchecked")
     private static Properties parse_args(ThreadContext context, IRubyObject[] args) {
+      Properties argumentsHash = new Properties();
+      if (args.length == 0)
+        return argumentsHash;
       if (args.length > 7)
         throw context.getRuntime().newArgumentError("extra positional parameter");
     if (args.length != 7 && args.length != 1)
       throw context.getRuntime().newArgumentError(
           "Wrong number of arguments, see the documentation");
 
-      Properties argumentsHash = new Properties();
 
       if (args.length == 1) {
         // we have a string or hash
@@ -385,7 +387,7 @@ public class Connection extends RubyObject {
 
     /******     PG::Connection INSTANCE METHODS: Connection Control     ******/
 
-    @JRubyMethod(rest = true, required = 1)
+    @JRubyMethod(rest = true)
     public IRubyObject initialize(ThreadContext context, IRubyObject[] args) {
         Properties props = parse_args(context, args);
 
@@ -402,7 +404,7 @@ public class Connection extends RubyObject {
 
             LAST_CONNECTION = this;
         } catch (Exception e) {
-            throw context.runtime.newRuntimeError(e.getLocalizedMessage());
+            throw newPgError(context, e.getLocalizedMessage(), null, null);
         }
         return context.nil;
     }

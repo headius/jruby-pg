@@ -51,6 +51,12 @@ describe PG::Connection do
   end
 
   describe 'basic connection properties' do
+    it 'can connect without any arguments' do
+      expect {
+        conn = PG.connect
+      }.to raise_error(PGError, /database.*does not exist/)
+    end
+
     it 'can sends the options to the server' do
       conn = PG.connect "#{@conninfo} user=password password=secret options = '-c geqo=off'"
       res = conn.query('show geqo')
