@@ -248,7 +248,7 @@ describe PG::Connection do
           # ignore
         end
         conn = PG.connect "#{@conninfo} user=password"
-      }.to raise_error(RuntimeError, /authentication failed/)
+      }.to raise_error(PGError, /authentication failed/)
     end
 
     it 'connects to the server using ssl' do
@@ -276,7 +276,7 @@ describe PG::Connection do
     it 'fails if the user does not exist' do
       expect {
         conn = PG.connect "#{@conninfo} user=nonexistentuser"
-      }.to raise_error(RuntimeError, /does not exist/)
+      }.to raise_error(PGError, /does not exist/)
     end
   end
 
