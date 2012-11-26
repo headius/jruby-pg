@@ -64,6 +64,8 @@ Rake::Task[:spec].prerequisites << :import_certs
 
 desc "import server certificates"
 task :import_certs do
+  puts "Importing server certificates now, don't freak out, this will need sudo access."
+  puts "For more info on what this is doing take a look at certs/import_key.sh"
   system 'certs/import_key.sh'
 end
 
