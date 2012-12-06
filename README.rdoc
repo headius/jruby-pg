@@ -29,6 +29,15 @@ and We'll be happy to fix them.
 
 == PROBLEMS:
 
+* Due to a bug in JRuby Array#delete
+  (https://github.com/jruby/jruby/issues/411) you'll need JRuby 1.7.1
+  or later.
+* Due to a bug in the json gem
+  (https://github.com/flori/json/pull/152) you'll need gem version
+  1.7.6 or later.  1.7.6 hasn't been released yet, so you'll have to
+  use master. This bug and the previous one don't affect this gem but
+  rather activerecord itself. The bug was discovered since we run the
+  full activerecord test suite on this gem.
 * The current implementation targets postgres protocol V3 (introduced in v 7.4)
   only. I'll wait until someone ask for support of earlier versions.
 * We need better test coverage since we're doing more than ruby-pg
@@ -54,8 +63,8 @@ and We'll be happy to fix them.
 You'll need postgres to be installed on your system. In order for you
 to be able to run rails test suite, you'll also need the +hstore+ extension
 which is also available in the +postgresql-contrib+ Ubuntu package (see
-http://www.postgresql.org/docs/9.0/static/hstore.htmlhttp://www.postgresql.org/docs/9.0/static/hstore.html)
-for more info.
+http://www.postgresql.org/docs/9.0/static/hstore.html
+for more info) and +postgresql-server-dev+ to get the pg_config binary.
 
 You'll also need to create a new super user using your username and no password. You can
 use the following command to do that:
