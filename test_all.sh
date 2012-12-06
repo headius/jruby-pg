@@ -17,13 +17,15 @@ fi
 # clone my json branch that has a fix for the merge problem
 json_dir=tmp_json
 if [ ! -d $json_dir ]; then
-    if ! git clone git://github.com/jvshahid/json.git $json_dir ; then
+    if ! git clone git://github.com/flori/json.git $json_dir ; then
         echo "Cannot clone json from ${json_dir}"
         exit 1
     fi
 fi
 pushd $json_dir
-git checkout fix_merge
+git checkout .
+git pull --rebase
+git checkout master
 rvm use --create jruby@json
 bundle install
 rake jruby_gem
@@ -60,7 +62,7 @@ grep -E -v "jdbc" $TMPDIR/gemfile_with_jruby_pg > Gemfile
 
 # finish the setup and start running the tests
 source ~/.rvm/scripts/rvm
-rvm use --create jruby-head@rails-test-jruby-pg
+rvm use --create jruby@rails-test-jruby-pg
 gem uninstall pg -a -x
 gem install $pg_pkg
 gem install $json_gem
