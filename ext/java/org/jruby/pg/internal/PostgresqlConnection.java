@@ -127,23 +127,17 @@ public class PostgresqlConnection {
     }
   }
 
-  public PostgresqlString escapeString(PostgresqlString string) {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    for (int i = 0 ; i < string.bytes.length; i++) {
-      byte b = string.bytes[i];
-      if ((b & 0x80) != 0x80) {
-        if (b == '\'' || (b == '\\' && !getStandardConformingStrings())) {
-          out.write(b);
-        }
-        out.write(b);
-      } else {
-        // FIXME: we need a way to test if given an encoding and a byte whether it's part
-        // of a multibyte character and how long is the sequence, so we can copy the bytes
-        // safely
-        throw new UnsupportedOperationException("Cannot escape multibyte strings for now");
+  public String escapeString(String string) {
+    StringBuffer out = new StringBuffer();
+    char[] chars = string.toCharArray();
+    for (int i = 0 ; i < chars.length; i++) {
+      char b = chars[i];
+      if (b == '\'' || (b == '\\' && !getStandardConformingStrings())) {
+        out.append(b);
       }
+      out.append(b);
     }
-    return new PostgresqlString(out.toByteArray());
+    return out.toString();
   }
 
   public ConnectionState connectPoll() throws IOException {

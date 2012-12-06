@@ -717,8 +717,8 @@ public class Connection extends RubyObject {
     @JRubyMethod(alias = "escape_string")
     public IRubyObject escape(ThreadContext context, IRubyObject _str) {
       RubyString str = (RubyString) _str;
-      byte[] bytes = str.getBytes();
-      bytes = postgresqlConnection.escapeString(new PostgresqlString(bytes)).getBytes();
+      String javaString = str.toString();
+      byte[] bytes = postgresqlConnection.escapeString(javaString).getBytes();
       RubyEncoding encoding = (RubyEncoding) internal_encoding(context);
       return context.runtime.newString(new ByteList(bytes, encoding.getEncoding()));
     }
