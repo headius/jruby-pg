@@ -53,12 +53,12 @@ pushd $rails_dir
 
 # reset any changes and get the latest
 git checkout .
-git fetch --all && git rebase origin/master
+git remote update && git rebase origin/master
 
 # replace the jdbc gem with pg and force rails to use us instead
-grep -E -v 'pg' Gemfile > $TMPDIR/gemfile_wo_ruby_pg
-sed -E "s/gem 'activerecord-jdbcpostgresql.*/gem 'pg', '${pg_ver}'/g" $TMPDIR/gemfile_wo_ruby_pg > $TMPDIR/gemfile_with_jruby_pg
-grep -E -v "jdbc" $TMPDIR/gemfile_with_jruby_pg > Gemfile
+grep -E -v 'pg' Gemfile > $TMPDIR/gemfile.1
+sed -E "s/gem 'activerecord-jdbcpostgresql.*/gem 'pg', '${pg_ver}'/g" $TMPDIR/gemfile.1 > $TMPDIR/gemfile.2
+grep -E -v "jdbc|racc" $TMPDIR/gemfile.2 > Gemfile
 
 # finish the setup and start running the tests
 source ~/.rvm/scripts/rvm
