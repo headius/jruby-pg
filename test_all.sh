@@ -33,8 +33,8 @@ rake package
 popd
 echo "$json_dir/pkg"
 ls $json_dir/pkg
-json_gem=$(readlink -f $json_dir/pkg/json-1.7.5-java.gem)
-json_pure_gem=$(readlink -f $json_dir/pkg/json_pure-1.7.5.gem)
+json_gem=$(readlink -f $json_dir/pkg/json-1.7.6-java.gem)
+json_pure_gem=$(readlink -f $json_dir/pkg/json_pure-1.7.6.gem)
 
 # Run rails test suite
 rails_dir=tmp_rails
