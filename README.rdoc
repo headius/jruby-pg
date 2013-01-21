@@ -33,8 +33,9 @@ and We'll be happy to fix them.
   (https://github.com/jruby/jruby/issues/411) you'll need JRuby 1.7.1
   or later.
 * Due to a bug in the json gem
-  (https://github.com/flori/json/pull/152) you'll need gem version
-  1.7.6 or later.  1.7.6 hasn't been released yet, so you'll have to
+  (https://github.com/flori/json/pull/152) and (https://github.com/flori/json/pull/155)
+  you'll need gem version
+  1.7.7 or later.  1.7.7 hasn't been released yet, so you'll have to
   use master. This bug and the previous one don't affect this gem but
   rather activerecord itself. The bug was discovered since we run the
   full activerecord test suite on this gem.
