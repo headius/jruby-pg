@@ -35,10 +35,7 @@ and We'll be happy to fix them.
 * Due to a bug in the json gem
   (https://github.com/flori/json/pull/152) and (https://github.com/flori/json/pull/155)
   you'll need gem version
-  1.7.7 or later.  1.7.7 hasn't been released yet, so you'll have to
-  use master. This bug and the previous one don't affect this gem but
-  rather activerecord itself. The bug was discovered since we run the
-  full activerecord test suite on this gem.
+  1.7.7 or later.
 * The current implementation targets postgres protocol V3 (introduced in v 7.4)
   only. I'll wait until someone ask for support of earlier versions.
 * We need better test coverage since we're doing more than ruby-pg
