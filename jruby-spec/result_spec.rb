@@ -21,6 +21,15 @@ describe PG::Result do
     teardown_testing_db( @conn )
   end
 
+  it "should return an error if a duplicate key is inserted" do
+		@conn.exec 'CREATE TABLE Foo ( bar INTEGER PRIMARY KEY )'
+    query = 'INSERT INTO Foo (bar) VALUES (1)'
+    @conn.exec query
+		expect {
+      @conn.exec query
+		}.to raise_error( PGError, /duplicate/i )
+  end
+
   it 'returns the number of rows affected by INSERT and DELETE' do
     @conn.exec 'CREATE TABLE FOO (BAR INT)'
     res = @conn.exec 'INSERT INTO FOO VALUES (1)'
