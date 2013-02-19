@@ -39,10 +39,12 @@ and We'll be happy to fix them.
 * The current implementation targets postgres protocol V3 (introduced in v 7.4)
   only. I'll wait until someone ask for support of earlier versions.
 * We need better test coverage since we're doing more than ruby-pg
-* Run ActiveRecord and pg_search test suites on this implementation
+* Run pg_search test suites on this implementation
 * lo_import and lo_export are not implemented yet
 * More Documentation especially in the parts that deal with the protocol.
 * We currently have some failing tests when we run the activerecord test suite.
+  The failing tests are due to the inconsistencies between JRuby and MRI (see
+  https://github.com/jruby/jruby/issues/540 and https://github.com/jruby/jruby/pull/539)
 * Profiling the library would be awesome, but will try to get it running first
   then optimize.
 * JRuby 1.6.x (1.8 mode) needs to be tested.
