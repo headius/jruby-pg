@@ -280,6 +280,16 @@ describe PG::Connection do
     end
   end
 
+  describe 'reset' do
+    it 'should reconnect when reset is called' do
+      conn = PG.connect @conninfo
+      old_pid = conn.exec('select pg_backend_pid()').getvalue(0, 0)
+      conn.reset
+      new_pid = conn.exec('select pg_backend_pid()').getvalue(0, 0)
+      old_pid.should_not== new_pid
+    end
+  end
+
   describe 'large object api' do
     it "handles large object methods properly" do
       fd = oid = 0

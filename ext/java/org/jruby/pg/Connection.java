@@ -62,6 +62,7 @@ public class Connection extends RubyObject {
     protected PostgresqlString BEGIN_QUERY = new PostgresqlString("BEGIN");
     protected PostgresqlString COMMIT_QUERY = new PostgresqlString("COMMIT");
     protected PostgresqlString ROLLBACK_QUERY = new PostgresqlString("ROLLBACK");
+    private Properties props;
 
     static {
       postgresEncodingToRubyEncoding.put("BIG5",          "Big5"        );
@@ -204,19 +205,9 @@ public class Connection extends RubyObject {
 
     @JRubyMethod(rest = true, meta = true)
     public static IRubyObject connect_start(ThreadContext context, IRubyObject self, IRubyObject[] args, Block block) {
-      try {
-        Connection connection = new Connection(context.runtime, context.runtime.getModule("PG").getClass("Connection"));
-        Properties props = parse_args(context, args);
-        connection.postgresqlConnection = PostgresqlConnection.connectStart(props);
-        if (block.isGiven()) {
-          IRubyObject value = block.yield(context, connection);
-          connection.finish(context);
-          return value;
-        }
-        return connection;
-      } catch (Exception e) {
-        throw context.runtime.newIOError(e.getLocalizedMessage());
-      }
+      Connection connection = new Connection(context.runtime, context.runtime.getModule("PG").getClass("Connection"));
+      connection.props = parse_args(context, args);
+      return connection.connectStart(context, block);
     }
 
     @JRubyMethod(meta = true)
@@ -254,6 +245,20 @@ public class Connection extends RubyObject {
         return context.runtime.newString(new ByteList(out.toByteArray()));
       } else {
         return _array;
+      }
+    }
+
+    private IRubyObject connectStart(ThreadContext context, Block block) {
+      try {
+        postgresqlConnection = PostgresqlConnection.connectStart(props);
+        if (block.isGiven()) {
+          IRubyObject value = block.yield(context, this);
+          finish(context);
+          return value;
+        }
+        return this;
+      } catch (Exception e) {
+        throw context.runtime.newIOError(e.getLocalizedMessage());
       }
     }
 
@@ -389,27 +394,11 @@ public class Connection extends RubyObject {
 
     @JRubyMethod(rest = true)
     public IRubyObject initialize(ThreadContext context, IRubyObject[] args) {
-        Properties props = parse_args(context, args);
-
-        // to make testing possible
-        if (System.getenv("PG_TEST_SSL") != null) {
-          props.setProperty("ssl", "require");
-        }
-
-        try {
-            // connection = (BaseConnection)driver.connect(connectionString, props);
-            postgresqlConnection = PostgresqlConnection.connectDb(props);
-            // set the encoding if the default internal_encoding is set
-            set_default_encoding(context);
-
-            LAST_CONNECTION = this;
-        } catch (Exception e) {
-            throw newPgError(context, e.getLocalizedMessage(), null, null);
-        }
-        return context.nil;
+        props = parse_args(context, args);
+        return connectSync(context);
     }
 
-    @JRubyMethod
+    @JRubyMethod(alias = "reset_poll")
     public IRubyObject connect_poll(ThreadContext context) {
       try {
         ConnectionState state = postgresqlConnection.connectPoll();
@@ -443,17 +432,14 @@ public class Connection extends RubyObject {
 
     @JRubyMethod
     public IRubyObject reset(ThreadContext context) {
-        return context.nil;
+        finish(context);
+        return connectSync(context);
     }
 
     @JRubyMethod
     public IRubyObject reset_start(ThreadContext context) {
-        return context.nil;
-    }
-
-    @JRubyMethod
-    public IRubyObject reset_poll(ThreadContext context) {
-        return context.nil;
+      finish(context);
+      return connectStart(context, Block.NULL_BLOCK);
     }
 
     @JRubyMethod
@@ -575,6 +561,25 @@ public class Connection extends RubyObject {
         }
 
         return createResult(context, set, args, block);
+    }
+
+    private IRubyObject connectSync(ThreadContext context) {
+        // to make testing possible
+        if (System.getenv("PG_TEST_SSL") != null) {
+          props.setProperty("ssl", "require");
+        }
+
+        try {
+            // connection = (BaseConnection)driver.connect(connectionString, props);
+            postgresqlConnection = PostgresqlConnection.connectDb(props);
+            // set the encoding if the default internal_encoding is set
+            set_default_encoding(context);
+
+            LAST_CONNECTION = this;
+        } catch (Exception e) {
+            throw newPgError(context, e.getLocalizedMessage(), null, null);
+        }
+        return context.nil;
     }
 
     private Format getFormat(ThreadContext context, IRubyObject [] args) {
