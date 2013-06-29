@@ -105,8 +105,13 @@ public class Result extends RubyObject {
     }
 
     @JRubyMethod
-    public IRubyObject fname(ThreadContext context, IRubyObject arg0) {
-        return context.nil;
+    public IRubyObject fname(ThreadContext context, IRubyObject _columnIndex) {
+      int columnIndex = (int) ((RubyFixnum) _columnIndex).getLongValue();
+      Column[] columns = jdbcResultSet.getDescription().getColumns();
+      if (columnIndex >= columns.length || columnIndex < 0)
+        throw context.runtime.newArgumentError("invalid field number " + columnIndex);
+
+      return context.runtime.newString(columns[columnIndex].getName());
     }
 
     @JRubyMethod

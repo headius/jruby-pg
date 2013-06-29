@@ -59,6 +59,11 @@ describe PG::Result do
     res.fields.should== ['n']
   end
 
+  it 'returns the names of the fields in the result set' do
+    res = @conn.exec "Select 1 as n"
+    res.fname(0).should== 'n'
+  end
+
   it 'returns newlines in text fields properly' do
     value = "foo\nbar"
     res = @conn.exec "VALUES ('#{@conn.escape value}')"
