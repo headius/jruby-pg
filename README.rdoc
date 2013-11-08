@@ -28,6 +28,14 @@ and We'll be happy to fix them.
 * Zero dependencies on other jars and gems
 * All active record test suite pass (except 5 tests see PROBLEMS).
 
+== How To Install
+
+Install via RubyGems:
+
+    gem install --prerelease pg_jruby
+
+Note: the pg (for jruby) gem is still a release candidate.
+
 == PROBLEMS:
 
 * Due to a bug in JRuby Array#delete
