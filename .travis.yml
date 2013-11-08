@@ -1,6 +1,8 @@
 rvm:
+  - jruby-20mode
   - jruby-19mode
   - jruby-18mode
 env:
   - PG_TEST_SLL=1
   - PG_TEST_SLL=0
+before_install: ./prepare_travis.sh
