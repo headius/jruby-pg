@@ -9,7 +9,7 @@ Hoe.plugin :gemspec
 Hoe.plugin :bundler
 Hoe.plugin :test
 
-HOE = Hoe.spec 'pg' do
+HOE = Hoe.spec 'pg_jruby' do
   self.readme_file  = ['README',    ENV['HLANG'], 'rdoc'].compact.join('.')
   self.history_file = ['CHANGELOG', ENV['HLANG'], 'rdoc'].compact.join('.')
 

@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 
 Gem::Specification.new do |s|
-  s.name = "pg"
+  s.name = "pg_jruby"
   s.version = "0.14.1.rc1"
   s.platform = "java"
 
