@@ -61,11 +61,6 @@ Note: the pg (for jruby) gem is still a release candidate.
 
 * Just a Postgres server and the gem.
 
-== INSTALL:
-
-* Currently we don't have the gem on rubygems, but I'll work on that if we can
-  get a stable version out.
-
 == DEVELOPERS:
 
 You'll need postgres to be installed on your system. In order for you
