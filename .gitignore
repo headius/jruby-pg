@@ -6,3 +6,5 @@ tmp_test_specs/
 pkg/
 .classpath
 .project
+TAGS
+refresh_tags.sh
