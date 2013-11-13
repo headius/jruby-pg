@@ -1209,6 +1209,8 @@ public class Connection extends RubyObject {
         }
         if (rubyEncodingToPostgresEncoding.containsKey(postgresEncoding))
             postgresEncoding = rubyEncodingToPostgresEncoding.get(postgresEncoding);
+        else
+          postgresEncoding = "SQL_ASCII";
         postgresqlConnection.setClientEncoding(postgresEncoding);
         return context.nil;
       } catch (IOException e) {

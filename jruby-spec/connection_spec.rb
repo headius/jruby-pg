@@ -138,6 +138,15 @@ describe PG::Connection do
       res.getvalue(0, 0).should == str
     end
 
+    it 'can set encoding to US-ASCII' do
+      old_internal_encoding = @conn.internal_encoding
+      begin
+        @conn.internal_encoding = 'US-ASCII'
+      ensure
+        @conn.internal_encoding = old_internal_encoding
+      end
+    end
+
     it 'handles any utf-8 strings properly' do
       str = 'いただきます！'
       res = @conn.exec 'VALUES ($1::text)', [str]
