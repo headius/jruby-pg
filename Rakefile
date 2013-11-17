@@ -26,6 +26,7 @@ HOE = Hoe.spec 'pg_jruby' do
                           ["rspec"]
                          ]
 
+  self.license 'MIT'
   self.spec_extras = { :platform => 'java' }
 
   self.clean_globs = ['spec/*', 'tmp_test_specs', 'tmp']
