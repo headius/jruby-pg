@@ -1,0 +1,9 @@
+* Connecting api
+  - [ ] Async api
+  - [ ] Sync api
+* Simple Query api
+  - [ ] Async api
+  - [ ] Sending command
+  - [ ] Getting result
+* Extended Query api
+* Copy In/Out

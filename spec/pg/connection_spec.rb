@@ -497,7 +497,7 @@ describe PG::Connection do
 	it "can handle incomplete #copy_data output queries" do
 		expect {
 			@conn.copy_data( "COPY (SELECT 1 UNION ALL SELECT 2) TO STDOUT" ) do |res|
-				@conn.get_copy_data
+        @conn.get_copy_data
 			end
 		}.to raise_error(PG::NotAllCopyDataRetrieved, /Not all/)
 		verify_clean_exec_status
@@ -730,8 +730,8 @@ describe PG::Connection do
 			sleep 0.1
 		end
 		serv.close
-		expect{ conn.block }.to raise_error(PG::ConnectionBad, /server closed the connection unexpectedly/)
-		expect{ conn.block }.to raise_error(PG::ConnectionBad, /can't get socket descriptor/)
+		expect{ conn.block }.to raise_error(PG::ConnectionBad, /server closed the connection unexpectedly|not connected/)
+		expect{ conn.block }.to raise_error(PG::ConnectionBad, /can't get socket descriptor|not connected/)
 	end
 
 	context "under PostgreSQL 9", :postgresql_90 do
@@ -756,8 +756,8 @@ describe PG::Connection do
 			end
 		end
 
-		it "calls the block supplied to wait_for_notify with the notify payload if it accepts " +
-		    "any number of arguments" do
+		it "calls the block supplied to wait_for_notify with the notify" +
+       " payload if it accepts any number of arguments" do
 
 			@conn.exec( 'ROLLBACK' )
 			@conn.exec( 'LISTEN knees' )
@@ -996,8 +996,8 @@ describe PG::Connection do
 					res = conn.exec("VALUES ('世界線航跡蔵')", [], 0)
 					out_string = res[0]['column1']
 				end
-				out_string.should == '世界線航跡蔵'
 				out_string.encoding.should == Encoding::UTF_8
+				out_string.should == '世界線航跡蔵'
 			end
 
 			it "should return results in the same encoding as the client (EUC-JP)" do
@@ -1234,7 +1234,7 @@ describe PG::Connection do
 				serv = TCPServer.new( '127.0.0.1', 54320 )
 				expect {
 					described_class.new( '127.0.0.1', 54320, "", "", "me", "xxxx", "somedb" )
-				}.to raise_error(PG::ConnectionBad, /server closed the connection unexpectedly/)
+				}.to raise_error(PG::ConnectionBad, /server closed the connection unexpectedly|reset by peer/)
 			end
 
 			sleep 0.5
