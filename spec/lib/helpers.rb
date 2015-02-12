@@ -7,6 +7,12 @@ require 'pg'
 
 TEST_DIRECTORY = Pathname.getwd + "tmp_test_specs"
 
+class Object
+  def jruby?
+    RUBY_PLATFORM =~ /java/
+  end
+end
+
 module PG::TestingHelpers
 
 
@@ -125,7 +131,7 @@ module PG::TestingHelpers
 		# supports fork()
 		logfh = File.open( logpath, File::WRONLY|File::CREAT|File::APPEND )
 
-		if RUBY_PLATFORM =~ /java/
+		if jruby?
       # FIXME: for some reason redirection in the system method don't
       # work, so I ended up with this lengthy hack
       logpath ||= "/dev/null"

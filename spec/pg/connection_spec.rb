@@ -262,39 +262,46 @@ describe PG::Connection do
 		error.should == true
 	end
 
-	it "can stop a thread that runs a blocking query with async_exec" do
-		start = Time.now
-		t = Thread.new do
-			@conn.async_exec( 'select pg_sleep(10)' )
-		end
-		sleep 0.1
+  # We disable the following tests for JRuby. First because
+  # Thread#kill isn't safe and on JRuby it can't effectively stop a
+  # thread running native Java code. Second, JVM doesn't play nice
+  # with signals especially USR1. Sending the signal to the JVM will
+  # cause it to exit
+  unless jruby?
+    it "can stop a thread that runs a blocking query with async_exec" do
+      start = Time.now
+      t = Thread.new do
+        @conn.async_exec( 'select pg_sleep(10)' )
+      end
+      sleep 0.1
 
-		t.kill
-		t.join
-		(Time.now - start).should < 10
-	end
+      t.kill
+      t.join
+      (Time.now - start).should < 10
+    end
 
-	it "should work together with signal handlers" do
-		signal_received = false
-		trap 'USR1' do
-			signal_received = true
-		end
+    it "should work together with signal handlers" do
+      signal_received = false
+      trap 'USR1' do
+        signal_received = true
+      end
 
-		Thread.new do
-			sleep 0.1
-			Process.kill("USR1", Process.pid)
-		end
-		@conn.exec("select pg_sleep(0.3)")
-		signal_received.should be_true
+      Thread.new do
+        sleep 0.1
+        Process.kill("USR1", Process.pid)
+      end
+      @conn.exec("select pg_sleep(0.3)")
+      signal_received.should be_true
 
-		signal_received = false
-		Thread.new do
-			sleep 0.1
-			Process.kill("USR1", Process.pid)
-		end
-		@conn.async_exec("select pg_sleep(0.3)")
-		signal_received.should be_true
-	end
+      signal_received = false
+      Thread.new do
+        sleep 0.1
+        Process.kill("USR1", Process.pid)
+      end
+      @conn.async_exec("select pg_sleep(0.3)")
+      signal_received.should be_true
+    end
+  end
 
 
 	it "automatically rolls back a transaction started with Connection#transaction if an exception " +
