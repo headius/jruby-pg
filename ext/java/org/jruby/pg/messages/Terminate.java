@@ -1,22 +1,14 @@
 package org.jruby.pg.messages;
 
-import java.nio.ByteBuffer;
 
-public class Terminate extends ProtocolMessage {
-  private final byte[] bytes = {'X', 0, 0, 0, 4};
-
-  @Override
-  public int getLength() {
-    return bytes.length - 1;
-  }
-
+public class Terminate extends FrontendMessage {
   @Override
   public MessageType getType() {
     return MessageType.Terminate;
   }
 
   @Override
-  public ByteBuffer toBytes() {
-    return ByteBuffer.wrap(bytes);
+  public void writeInternal(ProtocolWriter writer) {
+    // nothing, this is an empty message
   }
 }

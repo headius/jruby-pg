@@ -2,6 +2,7 @@ package org.jruby.pg;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.Writer;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -33,16 +34,17 @@ public class Connection extends RubyObject {
   private final static String[] POSITIONAL_ARGS = {
     "host", "port", "options", "tty", "dbname", "user", "password"
   };
-
   private final static Map<String, String> postgresEncodingToRubyEncoding = new HashMap<String, String>();
   private final static Map<String, String> rubyEncodingToPostgresEncoding = new HashMap<String, String>();
 
-  protected PostgresqlConnection postgresConnection;
-
-  protected PostgresqlString BEGIN_QUERY = new PostgresqlString("BEGIN");
-  protected PostgresqlString COMMIT_QUERY = new PostgresqlString("COMMIT");
-  protected PostgresqlString ROLLBACK_QUERY = new PostgresqlString("ROLLBACK");
+  // private state
+  private  PostgresqlConnection postgresConnection;
   private Properties props;
+  private IRubyObject proc;
+
+  private PostgresqlString BEGIN_QUERY = new PostgresqlString("BEGIN");
+  private PostgresqlString COMMIT_QUERY = new PostgresqlString("COMMIT");
+  private PostgresqlString ROLLBACK_QUERY = new PostgresqlString("ROLLBACK");
 
   // the cached rubyIO that is returned by socket_io
   private RubyIO rubyIO;
@@ -354,6 +356,7 @@ public class Connection extends RubyObject {
 
   @JRubyMethod(rest = true)
   public IRubyObject initialize(ThreadContext context, IRubyObject[] args) {
+    proc = context.nil;
     props = parse_args(context, args);
     return connectSync(context);
   }
@@ -870,13 +873,43 @@ public class Connection extends RubyObject {
     return context.nil;
   }
 
-  @JRubyMethod
-  public IRubyObject trace(ThreadContext context, IRubyObject arg0) {
+  @JRubyMethod(required = 1)
+  public IRubyObject trace(final ThreadContext context, IRubyObject arg0) {
+    IRubyObject fd = arg0.callMethod(context, "fileno");
+    if(!(fd instanceof RubyFixnum)) {
+      throw context.runtime.newArgumentError("expected fileno to return a fixnum");
+    }
+    RubyString mode = context.runtime.newString("w");
+    RubyClass rubyIO = (RubyClass) context.runtime.getClassFromPath("IO");
+    IRubyObject origIO = rubyIO.newInstance(context, new IRubyObject[] {fd, mode},
+                                            Block.NULL_BLOCK);
+    origIO.callMethod(context, "autoclose=", context.runtime.getFalse());
+    final IRubyObject io = origIO.callMethod(context, "dup");
+
+    postgresConnection.trace(new Writer() {
+      @Override
+      public void write(char[] cbuf, int off, int len) throws IOException {
+        IRubyObject str = context.runtime.newString(new String(cbuf, off, len));
+        io.callMethod(context, "write", str);
+        flush();
+      }
+
+      @Override
+      public void flush() throws IOException {
+        io.callMethod(context, "flush");
+      }
+
+      @Override
+      public void close() throws IOException {
+        io.callMethod(context, "close");
+      }
+    });
     return context.nil;
   }
 
   @JRubyMethod
   public IRubyObject untrace(ThreadContext context) {
+    postgresConnection.untrace();
     return context.nil;
   }
 
@@ -1284,7 +1317,7 @@ public class Connection extends RubyObject {
       getConnection(context).consumeInput();
     } catch(IOException ex) {
       throw newPgErrorCommon(context, ex.getLocalizedMessage(),
-      "ConnectionBad", null);
+                             "ConnectionBad", null);
     }
 
     long abortTime = 0;

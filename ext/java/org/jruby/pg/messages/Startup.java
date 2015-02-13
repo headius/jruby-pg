@@ -1,34 +1,27 @@
 package org.jruby.pg.messages;
 
-import java.io.ByteArrayOutputStream;
-import java.nio.ByteBuffer;
-
-public class Startup extends ProtocolMessage {
-  private final byte[] bytes;
+public class Startup extends FrontendMessage {
+  private String user;
+  private String database;
+  private String options;
 
   public Startup(String user, String database, String options) {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    try {
-      ByteUtils.writeInt4(out, 0);
-      ByteUtils.writeInt2(out, 3);
-      ByteUtils.writeInt2(out, 0);
-      ByteUtils.writeString(out, "user");
-      ByteUtils.writeString(out, user);
-      ByteUtils.writeString(out, "database");
-      ByteUtils.writeString(out, database);
-      ByteUtils.writeString(out, "options");
-      ByteUtils.writeString(out, options);
-      out.write('\0');
-    } catch(Exception e) {
-      // we cannot be here
-    }
-    this.bytes = out.toByteArray();
-    ByteUtils.fixLength(bytes, 0);
+    this.user = user;
+    this.database = database;
+    this.options = options;
   }
 
   @Override
-  public int getLength() {
-    return bytes.length;
+  public void writeInternal(ProtocolWriter writer) {
+    writer.writeShort(3); // major version is 3
+    writer.writeShort(0); // minor version is 0
+    writer.writeString("user");
+    writer.writeString(user);
+    writer.writeString("database");
+    writer.writeString(database);
+    writer.writeString("options");
+    writer.writeString(options);
+    writer.writeByte((char) 0);
   }
 
   @Override
@@ -36,8 +29,4 @@ public class Startup extends ProtocolMessage {
     return MessageType.StartupMessage;
   }
 
-  @Override
-  public ByteBuffer toBytes() {
-    return ByteBuffer.wrap(bytes);
-  }
 }

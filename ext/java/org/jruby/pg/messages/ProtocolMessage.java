@@ -1,6 +1,5 @@
 package org.jruby.pg.messages;
 
-import java.nio.ByteBuffer;
 
 public abstract class ProtocolMessage {
   public static enum MessageType {
@@ -47,17 +46,15 @@ public abstract class ProtocolMessage {
     Sync('S'),
     Terminate('X');
 
-  private MessageType(char firstByte) {
-    this.firstByte = (byte) firstByte;
-  }
+    private MessageType(char firstByte) {
+      this.firstByte = (byte) firstByte;
+    }
 
-  public final byte firstByte;
+    public final byte firstByte;
   }
 
   public byte getFirstByte() {
     return getType().firstByte;
   }
-  public abstract int getLength();
   public abstract MessageType getType();
-  public abstract ByteBuffer toBytes();
 }

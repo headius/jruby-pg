@@ -1,22 +1,14 @@
 package org.jruby.pg.messages;
 
-import java.nio.ByteBuffer;
 
-public class Flush extends ProtocolMessage {
-  private final byte [] bytes = {'H', 0, 0, 0, 4};
-
-  @Override
-  public int getLength() {
-    return -1;
-  }
-
+public class Flush extends FrontendMessage {
   @Override
   public MessageType getType() {
     return MessageType.Flush;
   }
 
   @Override
-  public ByteBuffer toBytes() {
-    return ByteBuffer.wrap(bytes);
+  public void writeInternal(ProtocolWriter writer) {
+    // nothing, this is an empty message
   }
 }

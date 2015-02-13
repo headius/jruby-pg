@@ -3,6 +3,7 @@ package org.jruby.pg.internal;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.Writer;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
@@ -32,7 +33,7 @@ import org.jruby.pg.messages.ProtocolMessage.MessageType;
 /**
  * postgresql connection
  */
-public class PostgresqlConnection {
+public class PostgresqlConnection implements ProtocolReader, ProtocolWriter {
   // this hashmap holds the static status of the parameters, the last
   // connection wins
   private static final Map<String, String> staticParameters =
@@ -112,6 +113,14 @@ public class PostgresqlConnection {
 
   // store the non blocking mode of the connection
   private boolean nonBlocking;
+
+  // holds the length's position of the current message being sent,
+  // and the position of the first byte. this is used by writeMsgEnd
+  // to write the final size
+  private int lengthPosition = -1, firstPosition = -1;
+
+  // used to trace the activity of the connection
+  private PrintWriter tracer;
 
   /**
    * Create a new connection asynchronously using the specified
@@ -869,7 +878,219 @@ public class PostgresqlConnection {
     return new ResultSet().setStatus(status);
   }
 
+  /**
+   * Set the given writer as the tracer of the connection. The writer
+   * will receive strings describing messages as they are
+   * sent/received to/from the backend
+   */
+  public void trace(Writer tracer) {
+    untrace();
+    this.tracer = new PrintWriter(tracer);
+  }
+
+  /**
+   * Remove any previously added tracer
+   */
+  public void untrace() {
+    if(this.tracer != null) {
+      this.tracer.flush();
+      this.tracer = null;
+    }
+  }
+
+  /**
+   * Set the notice receiver
+   */
+  public NoticeReceiver setNoticeReceiver(NoticeReceiver receiver) {
+    NoticeReceiver oldReceiver = this.receiver;
+    if(receiver != null) {
+      this.receiver = receiver;
+    }
+    return oldReceiver;
+  }
+
+  // ProtocolReader methods
+
+  // Note for all ProtocolReader methods, the buffer is assumed to be
+  // ready for read here, i.e. it's flipped.
+
+  public boolean hasCompleteMessage() {
+    if(inBuffer.remaining() < 5) {
+      return false;
+    }
+
+    try {
+      inBuffer.mark();
+      // get the type of the message
+      inBuffer.get();
+      int len = inBuffer.getInt();
+      if(inBuffer.remaining() < len - 4) {
+        // there isn't enough data, return for now
+        return false;
+      }
+      return true;
+    }
+    finally {
+      inBuffer.reset();
+    }
+  }
+
+  public byte getByte() {
+    byte b = inBuffer.get();
+    if(tracer != null) {
+      tracer.printf("From backend> %c\n", b);
+    }
+    return b;
+  }
+
+  public int getInt() {
+    int i = inBuffer.getInt();
+    if(tracer != null) {
+      tracer.printf("From backend (#%d)> %d\n", 4, i);
+    }
+    return i;
+  }
+
+  public short getShort() {
+    short s = inBuffer.getShort();
+    if(tracer != null) {
+      tracer.printf("From backend (#%d)> %d\n", 2, s);
+    }
+    return s;
+  }
+
+  public String getString() {
+    ByteBuffer slice = inBuffer.slice();
+    while(slice.get() != '\0')
+      ;
+    slice.flip();
+    int len = slice.remaining();
+    // copy the entire string without the null byte
+    String s = new String(slice.array(), slice.arrayOffset(), len - 1);
+    inBuffer.position(inBuffer.position() + len);
+    if(tracer != null) {
+      tracer.printf("From backend> \"%s\"\n", s);
+    }
+    return s;
+  }
+
+  public byte[] getNChar(int len) {
+    byte[] bytes = new byte[len];
+    inBuffer.get(bytes);
+    if(tracer != null) {
+      tracer.printf("From backend (%d)> %s\n", bytes.length, new String(bytes));
+    }
+    return bytes;
+  }
+
+  // ProtocolWriter methods
+
+  public void writeMsgStart(byte b) {
+    if(lengthPosition >= 0) {
+      throw new RuntimeException("lengthPosition should be negative");
+    }
+    int requiredLength = 4;
+    // if b is 0 then this message type doesn't have the initial byte
+    // that identifies its type, e.g. SSLRequest and StartupRequest.
+    if(b != 0) {
+      requiredLength += 1;
+    }
+    expandOutputBuffer(requiredLength);
+    firstPosition = outBuffer.position();
+    if(b != 0) {
+      outBuffer.put(b);
+    }
+    lengthPosition = outBuffer.position();
+    // temporary set the length to 0
+    outBuffer.putInt(0);
+    if(tracer != null) {
+      tracer.printf("To backend> Msg %c\n", b);
+    }
+  }
+
+  public void writeByte(char c) {
+    outBuffer.put((byte) c);
+    if(tracer != null) {
+      tracer.printf("To backend> %c\n", c);
+    }
+  }
+
+  public void writeInt(int n) {
+    expandOutputBuffer(4);
+    outBuffer.putInt(n);
+    if(tracer != null) {
+      tracer.printf("To backend (%d#)> %d\n", 4, n);
+    }
+  }
+
+  public void writeShort(int s) {
+    expandOutputBuffer(2);
+    outBuffer.putShort((short) s);
+    if(tracer != null) {
+      tracer.printf("To backend (%d#)> %d\n", 2, s);
+    }
+  }
+
+  public void writeNChar(byte[] bytes) {
+    expandOutputBuffer(bytes.length);
+    outBuffer.put(bytes);
+    if(tracer != null) {
+      tracer.printf("To backend> %s\n", new String(bytes));
+    }
+  }
+
+  public void writeString(byte[] bytes) {
+    int requiredLength = bytes.length;
+    // make sure the last byte is null otherwise, add our own
+    if(requiredLength == 0 || bytes[requiredLength - 1] != 0) {
+      requiredLength++;
+    }
+    expandOutputBuffer(requiredLength);
+    outBuffer.put(bytes);
+    if(requiredLength > bytes.length) {
+      outBuffer.put((byte) 0);
+    }
+    if(tracer != null) {
+      tracer.printf("To backend> \"%s\"\n", new String(bytes));
+    }
+  }
+
+  public void writeString(String s) {
+    writeString(s.getBytes());
+  }
+
+  public void writeString(PostgresqlString s) {
+    writeString(s.getBytes());
+  }
+
+  public void writeMsgEnd() {
+    if(lengthPosition < 0) {
+      throw new RuntimeException("lengthPosition shouldn't be negative");
+    }
+
+    int msgLen = outBuffer.position() - lengthPosition;
+    int actualLen = outBuffer.position() - firstPosition;
+    outBuffer.putInt(lengthPosition, msgLen);
+    lengthPosition = -1;
+    if(tracer != null) {
+      tracer.printf("To backend> Msg complete, length %d\n", actualLen);
+    }
+  }
+
   // private methods
+
+  /**
+   * Expand the output buffer to guarantee that at least required bytes
+   * are available in the output buffer
+   */
+  private void expandOutputBuffer(int required) {
+    if(outBuffer.remaining() < required) {
+      ByteBuffer newOutBuffer = ByteBuffer.allocate(outBuffer.capacity() * 2);
+      outBuffer.flip();
+      newOutBuffer.put(outBuffer);
+      outBuffer = newOutBuffer;
+    }
+  }
 
   private PollingStatus connectPollInternal()
   throws IOException, GeneralSecurityException {
@@ -903,13 +1124,15 @@ public class PostgresqlConnection {
         if(trySSL && channel == null) {
           // if we should try ssl and the channel wasn't created yet,
           // see if the server is willing to use ssl
-          ProtocolMessage msg = new SSLRequest();
-          ByteBuffer msgBuffer = msg.toBytes();
-          socket.write(msgBuffer);
-          if(msgBuffer.hasRemaining()) {
+
+          new SSLRequest().write(this);
+          outBuffer.flip();
+          socket.write(outBuffer);
+          if(outBuffer.hasRemaining()) {
             // throw an error if we can't send all the data
             throw new IOException("Cannot send SSL negotiation package");
           }
+          outBuffer.compact();
           cStatus = ConnectionStatus.CONNECTION_SSL_STARTUP;
           return PollingStatus.PGRES_POLLING_READING;
         } else if(!trySSL && channel == null) {
@@ -930,8 +1153,7 @@ public class PostgresqlConnection {
         String user = Utils.user(props);
         String dbname = Utils.dbname(props);
         String options = Utils.options(props);
-        ProtocolMessage msg = new Startup(user, dbname, options);
-        sendMessage(msg);
+        sendMessage(new Startup(user, dbname, options));
         // we should be able to send the entire message, otherwise
         // just fail
         if(!flush()) {
@@ -1379,7 +1601,7 @@ public class PostgresqlConnection {
    * Create an authentication message based on the Authentication
    * response received from the backend.
    */
-  private PasswordMessage createAuthenticationMessage(ProtocolMessage msg)
+  private FrontendMessage createAuthenticationMessage(ProtocolMessage msg)
   throws IOException {
     String password = Utils.password(props);
     String user = Utils.user(props);
@@ -1420,15 +1642,8 @@ public class PostgresqlConnection {
    * attempt to send the data on the socket. Call {@link flush} to
    * flush the output buffer to the socket
    */
-  private void sendMessage(ProtocolMessage msg) {
-    ByteBuffer buf = msg.toBytes();
-    if(outBuffer.remaining() < buf.remaining()) {
-      ByteBuffer newOutBuffer = ByteBuffer.allocate(outBuffer.capacity() * 2);
-      outBuffer.flip();
-      newOutBuffer.put(outBuffer);
-      outBuffer = newOutBuffer;
-    }
-    outBuffer.put(buf);
+  private void sendMessage(FrontendMessage msg) {
+    msg.write(this);
   }
 
   /**
@@ -1710,7 +1925,7 @@ public class PostgresqlConnection {
    */
   private ProtocolMessage getMessage() {
     inBuffer.flip();
-    ProtocolMessage msg = ProtocolMessageParser.parseMessage(inBuffer);
+    ProtocolMessage msg = ProtocolMessageParser.parseMessage(this);
     inBuffer.compact();
     return msg;
   }

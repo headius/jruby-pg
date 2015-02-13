@@ -22,16 +22,16 @@ public class ResultSet {
     PGRES_COPY_BOTH,            /* Copy In/Out data transfer in progress */
     PGRES_SINGLE_TUPLE;         /* single tuple from larger resultset */
 
-  public boolean isCopyStatus() {
-    switch(this) {
-    case PGRES_COPY_BOTH:
+    public boolean isCopyStatus() {
+      switch(this) {
+      case PGRES_COPY_BOTH:
       case PGRES_COPY_IN:
-        case PGRES_COPY_OUT:
-            return true;
-    default:
-      return false;
+      case PGRES_COPY_OUT:
+        return true;
+      default:
+        return false;
+      }
     }
-  }
   }
 
   private boolean binaryTuples;

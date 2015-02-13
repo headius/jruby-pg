@@ -70,12 +70,11 @@ public class LargeObjectAPI {
     buffer.putInt(argValue);
     Value value = new Value(buffer.array(), Format.Binary);
     ResultSet result = postgresqlConnection.execQueryParams(createString("select " + functionName + "($1)"), new Value[] { value },
-    Format.Binary, new int[0]);
+                       Format.Binary, new int[0]);
     if(result.getError() != null) {
       throw new PostgresqlException(result.getError(), result);
     }
-    buffer = result.getRows().get(0).getValues()[0];
-    return buffer.getInt();
+    return bytesToInt(result.getRows().get(0).getValues()[0]);
   }
 
   private final PostgresqlConnection postgresqlConnection;
@@ -86,12 +85,11 @@ public class LargeObjectAPI {
     Value fdValue = new Value(buffer.array(), Format.Binary);
     Value byteValue = new Value(bytes, Format.Binary);
     ResultSet result = postgresqlConnection.execQueryParams(createString("select lowrite($1, $2)"),
-    new Value[] { fdValue, byteValue }, Format.Binary, new int[0]);
+                       new Value[] { fdValue, byteValue }, Format.Binary, new int[0]);
     if(result.getError() != null) {
       throw new PostgresqlException(result.getError(), result);
     }
-    buffer = result.getRows().get(0).getValues()[0];
-    return buffer.getInt();
+    return bytesToInt(result.getRows().get(0).getValues()[0]);
   }
 
   public byte[] loRead(int fd, int count) throws PostgresqlException, IOException {
@@ -110,14 +108,11 @@ public class LargeObjectAPI {
     Value fdValue = new Value(fdBytes, Format.Binary);
     Value countValue = new Value(countBytes, Format.Binary);
     ResultSet result = postgresqlConnection.execQueryParams(createString("select loread($1, $2)"),
-    new Value[] { fdValue, countValue }, Format.Binary, new int[0]);
+                       new Value[] { fdValue, countValue }, Format.Binary, new int[0]);
     if(result.getError() != null) {
       throw new PostgresqlException(result.getError(), result);
     }
-    ByteBuffer value = result.getRows().get(0).getValues()[0];
-    byte[] bytes = new byte[value.remaining()];
-    value.get(bytes);
-    return bytes;
+    return result.getRows().get(0).getValues()[0];
   }
 
   public int loSeek(int fd, int offset, int whence) throws IOException, PostgresqlException {
@@ -142,14 +137,13 @@ public class LargeObjectAPI {
     Value offsetValue = new Value(offsetBytes, Format.Binary);
     Value whenceValue = new Value(whenceBytes, Format.Binary);
     ResultSet result = postgresqlConnection.execQueryParams(createString("select lo_lseek($1, $2, $3)"), new Value[] {
-      fdValue,
-      offsetValue, whenceValue
-    }, Format.Binary, new int[0]);
+                         fdValue,
+                         offsetValue, whenceValue
+                       }, Format.Binary, new int[0]);
     if(result.getError() != null) {
       throw new PostgresqlException(result.getError(), result);
     }
-    ByteBuffer value = result.getRows().get(0).getValues()[0];
-    return value.getInt();
+    return bytesToInt(result.getRows().get(0).getValues()[0]);
   }
 
   public int loTell(int fd) throws IOException, PostgresqlException {
@@ -177,8 +171,7 @@ public class LargeObjectAPI {
     if(result.getError() != null) {
       throw new PostgresqlException(result.getError(), result);
     }
-    ByteBuffer value = result.getRows().get(0).getValues()[0];
-    return value.getInt();
+    return bytesToInt(result.getRows().get(0).getValues()[0]);
   }
 
   public int loTruncate(int fd, int len) throws PostgresqlException, IOException {
@@ -201,15 +194,18 @@ public class LargeObjectAPI {
     Value value1Value = new Value(value1Bytes, Format.Binary);
     Value value2Value = new Value(value2Bytes, Format.Binary);
     ResultSet result = postgresqlConnection.execQueryParams(createString("select " + name + "($1, $2)"),
-    new Value[] { value1Value, value2Value }, Format.Binary, new int[0]);
+                       new Value[] { value1Value, value2Value }, Format.Binary, new int[0]);
     if(result.getError() != null) {
       throw new PostgresqlException(result.getError(), result);
     }
-    ByteBuffer value = result.getRows().get(0).getValues()[0];
-    return value.getInt();
+    return bytesToInt(result.getRows().get(0).getValues()[0]);
   }
 
   private PostgresqlString createString(String value) {
     return new PostgresqlString(value);
+  }
+
+  private static int bytesToInt(byte[] bytes) {
+    return ByteBuffer.wrap(bytes).getInt();
   }
 }

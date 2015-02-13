@@ -21,20 +21,20 @@ public class SecureByteChannel implements FlushableByteChannel {
 
   // A dummy trust manager that trusts all certificates
   private static final TrustManager[] DUMMY_TRUST_MANAGER = new TrustManager[] {
-    new X509TrustManager() {
-      @Override
-      public X509Certificate[] getAcceptedIssuers() {
-        return null;
-      }
-      @Override
-      public void checkClientTrusted(X509Certificate[] chain,
-                                     String authType) throws CertificateException {
-      }
-      @Override
-      public void checkServerTrusted(X509Certificate[] chain,
-                                     String authType) throws CertificateException {
-      }
+  new X509TrustManager() {
+    @Override
+    public X509Certificate[] getAcceptedIssuers() {
+      return null;
     }
+    @Override
+    public void checkClientTrusted(X509Certificate[] chain,
+                                   String authType) throws CertificateException {
+    }
+    @Override
+    public void checkServerTrusted(X509Certificate[] chain,
+                                   String authType) throws CertificateException {
+    }
+  }
   };
 
   // the ssl engine where all the encryption/decryption happen

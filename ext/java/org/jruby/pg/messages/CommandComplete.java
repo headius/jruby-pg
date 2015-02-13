@@ -26,11 +26,6 @@ public class CommandComplete extends BackendMessage {
   }
 
   @Override
-  public int getLength() {
-    return 4 + tag.getBytes().length;
-  }
-
-  @Override
   public MessageType getType() {
     return MessageType.CommandComplete;
   }

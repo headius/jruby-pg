@@ -8,11 +8,6 @@ public class AuthenticationCryptPassword extends BackendMessage {
   }
 
   @Override
-  public int getLength() {
-    return 10;
-  }
-
-  @Override
   public MessageType getType() {
     return MessageType.AuthenticationCryptPassword;
   }

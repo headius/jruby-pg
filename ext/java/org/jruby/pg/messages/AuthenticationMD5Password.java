@@ -11,11 +11,6 @@ public class AuthenticationMD5Password extends BackendMessage {
   }
 
   @Override
-  public int getLength() {
-    return 12;
-  }
-
-  @Override
   public MessageType getType() {
     return MessageType.AuthenticationMD5Password;
   }

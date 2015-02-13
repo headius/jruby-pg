@@ -1,6 +1,5 @@
 package org.jruby.pg;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 
 import org.jcodings.Encoding;
@@ -50,7 +49,7 @@ public class Result extends RubyObject {
     return context.runtime.newString(res.getStatus().toString());
   }
 
-  @JRubyMethod(name = {"result_error_message"})
+  @JRubyMethod
   public IRubyObject error_message(ThreadContext context) {
     String error = res.getError();
     if(error == null) {
@@ -209,7 +208,7 @@ public class Result extends RubyObject {
       throw context.runtime.newIndexError("row " + row + " is out of range");
     }
     DataRow dataRow = rows.get(row);
-    ByteBuffer[] columns = dataRow.getValues();
+    byte[][] columns = dataRow.getValues();
     if(column >= columns.length) {
       throw context.runtime.newIndexError("column " + column + " is out of range");
     }
@@ -380,18 +379,17 @@ public class Result extends RubyObject {
   }
 
   private IRubyObject valueAsString(ThreadContext context, int row, int column) {
-    ByteBuffer[] values = res.getRows().get(row).getValues();
+    byte[][] values = res.getRows().get(row).getValues();
     if(values[column] == null) {
       return context.nil;
     }
-    byte[] bytes = values[column].array();
-    int index = values[column].arrayOffset();
-    int len = values[column].capacity();
+
+    byte[] bytes = values[column];
 
     if(isBinary(column)) {
-      return context.runtime.newString(new ByteList(bytes, index, len));
+      return context.runtime.newString(new ByteList(bytes));
     } else {
-      return context.runtime.newString(new ByteList(bytes, index, len, encoding, false));
+      return context.runtime.newString(new ByteList(bytes, encoding, false));
     }
   }
 

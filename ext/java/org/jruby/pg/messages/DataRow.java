@@ -1,19 +1,11 @@
 package org.jruby.pg.messages;
 
-import java.nio.ByteBuffer;
 
 public class DataRow extends BackendMessage {
-  private final ByteBuffer[] values;
-  private final int length;
+  private final byte[][] values;
 
-  public DataRow(ByteBuffer[] values, int length) {
+  public DataRow(byte[][] values, int length) {
     this.values = values;
-    this.length = length;
-  }
-
-  @Override
-  public int getLength() {
-    return length;
   }
 
   @Override
@@ -21,7 +13,7 @@ public class DataRow extends BackendMessage {
     return MessageType.DataRow;
   }
 
-  public ByteBuffer[] getValues() {
+  public byte[][] getValues() {
     return values;
   }
 }

@@ -1,42 +1,25 @@
 package org.jruby.pg.messages;
 
-import java.io.ByteArrayOutputStream;
-import java.nio.ByteBuffer;
 
-public class CancelRequest extends ProtocolMessage {
+public class CancelRequest extends FrontendMessage {
   private final int pid;
   private final int secret;
-  private final byte[] bytes;
 
   public CancelRequest(int pid, int secret) {
     this.pid = pid;
     this.secret = secret;
-
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    try {
-      ByteUtils.writeInt4(out, getLength());
-      ByteUtils.writeInt4(out, 80877102);
-      ByteUtils.writeInt4(out, pid);
-      ByteUtils.writeInt4(out, secret);
-    } catch(Exception e) {
-      // we cannot be here
-    }
-    this.bytes = out.toByteArray();
   }
 
   @Override
-  public int getLength() {
-    return 16;
-  }
+  public void writeInternal(ProtocolWriter writer) {
+    writer.writeInt(80877102);
+    writer.writeInt(pid);
+    writer.writeInt(secret);
+  };
 
   @Override
   public MessageType getType() {
     return MessageType.CancelRequest;
-  }
-
-  @Override
-  public ByteBuffer toBytes() {
-    return ByteBuffer.wrap(bytes);
   }
 
   public int getPid() {

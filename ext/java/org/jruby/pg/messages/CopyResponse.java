@@ -9,11 +9,6 @@ public abstract class CopyResponse extends BackendMessage {
     this.columnFormats = columnFormats;
   }
 
-  @Override
-  public int getLength() {
-    return 4 + 1 + 2 + 2 * columnFormats.length;
-  }
-
   public Format getOverallFormat() {
     return overallFormat;
   }

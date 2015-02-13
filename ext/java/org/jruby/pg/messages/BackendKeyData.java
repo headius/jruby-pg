@@ -10,11 +10,6 @@ public class BackendKeyData extends BackendMessage {
   }
 
   @Override
-  public int getLength() {
-    return 12;
-  }
-
-  @Override
   public MessageType getType() {
     return MessageType.BackendKeyData;
   }

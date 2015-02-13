@@ -27,31 +27,24 @@ public class ErrorResponse extends BackendMessage {
 
     private byte code;
 
-  private ErrorField(int code) {
-    this.code = (byte) code;
-  }
+    private ErrorField(int code) {
+      this.code = (byte) code;
+    }
 
-  public byte getCode() {
-    return code;
-  }
+    public byte getCode() {
+      return code;
+    }
   }
 
   private final Map<Byte, String> fields;
-  private final int length;
 
   // the first byte of each array element is the code followed by the value
   public ErrorResponse(Map<Byte, String> fields, int length) {
     this.fields = fields;
-    this.length = length;
   }
 
   public String getErrorMessage() {
     return getErrorField(ErrorField.PG_DIAG_MESSAGE_PRIMARY);
-  }
-
-  @Override
-  public int getLength() {
-    return length;
   }
 
   @Override

@@ -1,58 +1,42 @@
 package org.jruby.pg.messages;
 
-import java.io.ByteArrayOutputStream;
-import java.nio.ByteBuffer;
-
 import org.jruby.pg.internal.PostgresqlString;
 
-public class Bind extends ProtocolMessage {
-  private final byte[] bytes;
-  private final int length;
+public class Bind extends FrontendMessage {
+  private final byte[] destinationPortal, sourceStatement;
+  private final Value[] params;
+  private final Format format;
 
   public Bind(PostgresqlString destinationPortal, PostgresqlString sourceStatement, Value[] params, Format format) {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    try {
-      out.write('B');
-      out.write(new byte[4]);
-      ByteUtils.writeString(out, destinationPortal);
-      ByteUtils.writeString(out, sourceStatement);
-      ByteUtils.writeInt2(out, params.length);
-      for(Value parameter : params) {
-        ByteUtils.writeInt2(out, parameter.getFormat().getValue());
-      }
-      ByteUtils.writeInt2(out, params.length);
-      for(Value parameter : params) {
-        if(parameter.getBytes() == null) {
-          ByteUtils.writeInt4(out, -1);
-        } else {
-          ByteUtils.writeInt4(out, parameter.getBytes().length);
-          out.write(parameter.getBytes());
-        }
-      }
-      ByteUtils.writeInt2(out, 1);
-      ByteUtils.writeInt2(out, format.getValue());
-    } catch(Exception ex) {
-      // we cannot be here
-    }
-
-    byte[] bytes = out.toByteArray();
-    ByteUtils.fixLength(bytes);
-    this.bytes = bytes;
-    this.length = bytes.length - 1;
+    this.destinationPortal = destinationPortal.getBytes();
+    this.sourceStatement = sourceStatement.getBytes();
+    this.params = params;
+    this.format = format;
   }
 
   @Override
-  public int getLength() {
-    return length;
+  public void writeInternal(ProtocolWriter writer) {
+    writer.writeString(destinationPortal);
+    writer.writeString(sourceStatement);
+    writer.writeShort(params.length);
+    for(Value parameter : params) {
+      writer.writeShort(parameter.getFormat().getValue());
+    }
+    writer.writeShort(params.length);
+    for(Value parameter : params) {
+      if(parameter.getBytes() == null) {
+        writer.writeInt(-1);
+      } else {
+        writer.writeInt(parameter.getBytes().length);
+        writer.writeNChar(parameter.getBytes());
+      }
+    }
+    writer.writeShort(1);
+    writer.writeShort(format.getValue());
   }
 
   @Override
   public MessageType getType() {
     return MessageType.Bind;
-  }
-
-  @Override
-  public ByteBuffer toBytes() {
-    return ByteBuffer.wrap(bytes);
   }
 }

@@ -12,11 +12,6 @@ public class NotificationResponse extends BackendMessage {
   }
 
   @Override
-  public int getLength() {
-    return -1;
-  }
-
-  @Override
   public MessageType getType() {
     return MessageType.NotificationResponse;
   }

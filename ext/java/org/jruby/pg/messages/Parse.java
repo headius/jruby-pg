@@ -1,46 +1,30 @@
 package org.jruby.pg.messages;
 
-import java.io.ByteArrayOutputStream;
-import java.nio.ByteBuffer;
-
 import org.jruby.pg.internal.PostgresqlString;
 
-public class Parse extends ProtocolMessage {
-
-  private final byte[] bytes;
-  private final int length;
+public class Parse extends FrontendMessage {
+  private PostgresqlString name;
+  private PostgresqlString query;
+  private int[] oids;
 
   public Parse(PostgresqlString name, PostgresqlString query, int [] oids) {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    try {
-      out.write('P');
-      ByteUtils.writeInt4(out, 0);
-      ByteUtils.writeString(out, name);
-      ByteUtils.writeString(out, query);
-      ByteUtils.writeInt2(out, oids.length);
-      for(int oid : oids) {
-        ByteUtils.writeInt4(out, oid);
-      }
-    } catch(Exception e) {
-      // we cannot be here
-    }
-    bytes = out.toByteArray();
-    ByteUtils.fixLength(bytes);
-    length = bytes.length;
+    this.name = name;
+    this.query = query;
+    this.oids = oids;
   }
 
   @Override
-  public int getLength() {
-    return length;
+  public void writeInternal(ProtocolWriter writer) {
+    writer.writeString(name.getBytes());
+    writer.writeString(query.getBytes());
+    writer.writeShort(oids.length);
+    for(int oid : oids) {
+      writer.writeInt(oid);
+    }
   }
 
   @Override
   public MessageType getType() {
     return MessageType.Parse;
-  }
-
-  @Override
-  public ByteBuffer toBytes() {
-    return ByteBuffer.wrap(bytes);
   }
 }
