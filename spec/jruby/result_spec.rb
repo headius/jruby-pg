@@ -20,11 +20,11 @@ describe PG::Result do
     @conn = setup_testing_db( "PG_Connection" )
   end
 
-  before( :each ) do
+  before( :each ) do |example|
     @conn.exec( 'BEGIN' ) unless example.metadata[:without_transaction]
   end
 
-  after( :each ) do
+  after( :each ) do |example|
     @conn.exec( 'ROLLBACK' ) unless example.metadata[:without_transaction]
   end
 

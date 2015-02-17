@@ -23,7 +23,7 @@ describe PG::Connection do
 		@conn = setup_testing_db( described_class.name )
 	end
 
-	before( :each ) do
+	before( :each ) do |example|
 		@conn.exec( 'BEGIN' ) unless example.metadata[:without_transaction]
 		if PG.respond_to?( :library_version )
 			@conn.exec_params %Q{SET application_name TO '%s'} %
@@ -31,7 +31,7 @@ describe PG::Connection do
 		end
 	end
 
-	after( :each ) do
+	after( :each ) do |example|
 		@conn.exec( 'ROLLBACK' ) unless example.metadata[:without_transaction]
 	end
 
