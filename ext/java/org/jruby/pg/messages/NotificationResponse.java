@@ -25,6 +25,11 @@ public class NotificationResponse extends BackendMessage {
   }
 
   public String getPayload() {
+    // the mri wrapper returns null if the payload is empty
+    if(payload.isEmpty()) {
+      return null;
+    }
+
     return payload;
   }
 }
