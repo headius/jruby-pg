@@ -78,17 +78,11 @@ $hoespec = Hoe.spec 'pg' do
 	]
 
 	self.rdoc_locations << "deveiate:/usr/local/www/public/code/#{remote_rdoc_dir}"
-  if jruby?
-    self.spec_extras[:platform] = 'java'
-  end
+  self.spec_extras[:platform] = 'java' if jruby?
 end
 
 if jruby?
   require "rake/javaextensiontask"
-  Rake::Task[:spec].prerequisites << :java_debug
-  task :java_debug do
-    ENV['JAVA_OPTS'] = '-Xdebug -Xrunjdwp:transport=dt_socket,address=8080,server=y,suspend=n' if ENV['JAVA_DEBUG'] == '1'
-  end
 
   Rake::JavaExtensionTask.new("pg_ext", $hoespec.spec) do |ext|
     jruby_home = RbConfig::CONFIG['prefix']
