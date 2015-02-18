@@ -85,11 +85,8 @@ if jruby?
   require "rake/javaextensiontask"
 
   Rake::JavaExtensionTask.new("pg_ext", $hoespec.spec) do |ext|
-    jruby_home = RbConfig::CONFIG['prefix']
     ext.ext_dir = 'ext/java'
     ext.lib_dir = 'lib'
-    jars = ["#{jruby_home}/lib/jruby.jar"]
-    ext.classpath = jars.map { |x| File.expand_path x }.join ':'
   end
 else
   load 'Rakefile.cross'
