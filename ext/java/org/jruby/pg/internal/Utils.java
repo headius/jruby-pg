@@ -3,16 +3,16 @@ package org.jruby.pg.internal;
 import java.util.Properties;
 
 public class Utils {
-  public static String user(Properties props) {
-    return props.getProperty("user", System.getProperty("user.name", ""));
+  public static String user(Properties prop) {
+    return getPropertyOrEnv(prop, "user", "PGUSER", System.getProperty("user.name", ""));
   }
 
   public static String dbname(Properties prop) {
-    return prop.getProperty("dbname", user(prop));
+    return getPropertyOrEnv(prop, "dbname", "PGDATABASE", user(prop));
   }
 
   public static String password(Properties prop) {
-    return prop.getProperty("password", null);
+    return getPropertyOrEnv(prop, "password", "PGPASSWORD", null);
   }
 
   public static String options(Properties prop) {
@@ -25,7 +25,8 @@ public class Utils {
 
 
   public static int port(Properties prop) {
-    return Integer.parseInt(prop.getProperty("port", "5432"));
+    String port = getPropertyOrEnv(prop, "port", "PGPORT", "5432");
+    return Integer.parseInt(port);
   }
 
   public static String host(Properties prop) {
@@ -37,15 +38,15 @@ public class Utils {
   }
 
   /**
-   * Get the given key from props, falling back to the given
+   * Get the given key from prop, falling back to the given
    * environment variable and finally to defaultValue
    */
-  private static String getPropertyOrEnv(Properties props, String key,
+  private static String getPropertyOrEnv(Properties prop, String key,
                                          String envVar, String defaultVal) {
     String envValue = System.getenv(envVar);
     if(envValue == null || envValue.isEmpty()) {
       envValue = defaultVal;
     }
-    return props.getProperty(key, envValue);
+    return prop.getProperty(key, envValue);
   }
 }
