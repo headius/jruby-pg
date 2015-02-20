@@ -893,7 +893,7 @@ public class PostgresqlConnection implements ProtocolReader, ProtocolWriter {
    */
   public void trace(Writer tracer) {
     untrace();
-    this.tracer = new PrintWriter(tracer);
+    this.tracer = new PrintWriter(tracer, true);
   }
 
   /**
@@ -1092,8 +1092,13 @@ public class PostgresqlConnection implements ProtocolReader, ProtocolWriter {
    * are available in the output buffer
    */
   private void expandOutputBuffer(int required) {
-    if(outBuffer.remaining() < required) {
-      ByteBuffer newOutBuffer = ByteBuffer.allocate(outBuffer.capacity() * 2);
+    int oldCapacity = outBuffer.capacity();
+    int oldRemaining = outBuffer.remaining();
+    if(oldRemaining < required) {
+      // try to double the buffer if this adds up enough space,
+      // otherwise add (required - oldRemaining)
+      int newCapacity = oldCapacity + Math.max(oldCapacity, required - oldRemaining);
+      ByteBuffer newOutBuffer = ByteBuffer.allocate(newCapacity);
       outBuffer.flip();
       newOutBuffer.put(outBuffer);
       outBuffer = newOutBuffer;
