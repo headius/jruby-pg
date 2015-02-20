@@ -56,8 +56,7 @@ $hoespec = Hoe.spec 'pg' do
 	self.extra_rdoc_files.include( 'POSTGRES', 'LICENSE' )
 	self.extra_rdoc_files.include( 'ext/*.c' )
 
-	self.developer 'Michael Granger', 'ged@FaerieMUD.org'
-	self.developer 'Lars Kanis', 'lars@greiz-reinsdorf.de'
+	self.developer 'John Shahid', 'jvshahid@gmail.com'
 
 	self.dependency 'rake-compiler', '~> 0.9', :developer
 	self.dependency 'hoe', '~> 3.5.1', :developer
@@ -66,6 +65,10 @@ $hoespec = Hoe.spec 'pg' do
 
 	self.spec_extras[:licenses] = ['BSD', 'Ruby', 'GPL']
 	self.spec_extras[:extensions] = [ 'ext/extconf.rb' ] unless jruby?
+
+  self.spec_extras[:files] = Proc.new do |f|
+    self.spec_extras[:files] = f << 'lib/pg_ext.jar'
+  end
 
 	self.require_ruby_version( '>= 1.8.7' )
 
