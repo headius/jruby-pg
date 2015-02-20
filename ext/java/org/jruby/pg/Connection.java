@@ -515,6 +515,10 @@ public class Connection extends RubyObject {
 
   @JRubyMethod(alias = {"query", "exec_params", "async_exec", "async_query"}, required = 1, optional = 2)
   public IRubyObject exec(ThreadContext context, IRubyObject[] args, Block block) {
+    if(postgresConnection == null) {
+      throw newPgError(context, "closed connection used", null);
+    }
+
     PostgresqlString query = rubyStringAsPostgresqlString(args[0]);
     ResultSet set = null;
     try {
@@ -1341,7 +1345,7 @@ public class Connection extends RubyObject {
       getConnection(context).consumeInput();
     } catch(IOException ex) {
       throw newPgErrorCommon(context, ex.getLocalizedMessage(),
-                             "ConnectionBad", null);
+      "ConnectionBad", null);
     }
 
     long abortTime = 0;
