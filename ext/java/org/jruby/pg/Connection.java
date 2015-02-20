@@ -155,7 +155,7 @@ public class Connection extends RubyObject {
 
   @JRubyMethod(meta = true, required = 1, argTypes = {RubyArray.class})
   public static IRubyObject escape_bytea(ThreadContext context, IRubyObject self, IRubyObject array) {
-    RubyString str = (RubyString) array;
+    String str = array.asJavaString();
     byte[] bytes = PostgresqlConnection.escapeBytesStatic(str.getBytes());
     return context.runtime.newString(new ByteList(bytes));
   }
@@ -172,7 +172,9 @@ public class Connection extends RubyObject {
     }
 
     try {
-      byte[] cryptedPassword = PostgresqlConnection.encrypt(((RubyString) username).getBytes(), ((RubyString) password).getBytes());
+      byte[] cryptedPassword = PostgresqlConnection.encrypt(
+                                 (username.asJavaString()).getBytes(),
+                                 (password.asJavaString()).getBytes());
       return context.runtime.newString(new ByteList(cryptedPassword));
     } catch(NoSuchAlgorithmException e) {
       throw context.runtime.newRuntimeError(e.getLocalizedMessage());
@@ -1533,7 +1535,7 @@ public class Connection extends RubyObject {
   }
 
   private PostgresqlString rubyStringAsPostgresqlString(IRubyObject str) {
-    return new PostgresqlString(((RubyString) str).getBytes());
+    return new PostgresqlString(str.asJavaString().getBytes());
   }
 
   private IRubyObject setClientEncodingCommon(ThreadContext context, String encoding) throws IOException  {

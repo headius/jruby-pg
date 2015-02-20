@@ -70,6 +70,12 @@ describe PG::Connection do
       res.getvalue( 0, 0 ).should be_nil
     end
 
+    it 'raise TypeError when exec is called with nil' do
+      expect {
+        @conn.exec nil
+      }.to raise_error(TypeError)
+    end
+
     it 'returns an empty array when fields is called after an CREATE/DROP query' do
       res = @conn.exec 'CREATE TABLE FOO (BAR INT)'
       res.fields.should == []
