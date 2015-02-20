@@ -1261,7 +1261,6 @@ public class PostgresqlConnection implements ProtocolReader, ProtocolWriter {
         // if b is a quote character or a backslack in an identifier
         // then repeat the character twice to escape it
         out.write(b);
-        out.write(b);
       }
 
       if(b == '\0') {

@@ -43,6 +43,11 @@ describe PG::Connection do
       @conn.server_version.should >=(80200)
     end
 
+    it 'quotes double quotes in identifier names correctly' do
+      ident = @conn.quote_ident 'foo"bar'
+      ident.should== '"foo""bar"'
+    end
+
     it 'quotes identifier correctly' do
       table_name = @conn.quote_ident('foo')
       column_name = @conn.quote_ident('bar')
