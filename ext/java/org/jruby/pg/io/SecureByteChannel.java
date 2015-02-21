@@ -133,13 +133,14 @@ public class SecureByteChannel implements FlushableByteChannel {
    * @return the number of bytes consumed from the buffer
    */
   public int write(ByteBuffer buf) throws IOException {
-    if(!outBuffer.hasRemaining()) {
+    int bytesConsumed = sslEngine.wrap(buf, outBuffer).bytesConsumed();
+    if(bytesConsumed == 0) {
       outBuffer.flip();
       channel.write(outBuffer);
       outBuffer.compact();
     }
 
-    return sslEngine.wrap(buf, outBuffer).bytesConsumed();
+    return bytesConsumed;
   }
 
   /**
