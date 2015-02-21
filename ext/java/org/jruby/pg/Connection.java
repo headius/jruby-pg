@@ -1345,7 +1345,7 @@ public class Connection extends RubyObject {
       getConnection(context).consumeInput();
     } catch(IOException ex) {
       throw newPgErrorCommon(context, ex.getLocalizedMessage(),
-      "ConnectionBad", null);
+                             "ConnectionBad", null);
     }
 
     long abortTime = 0;

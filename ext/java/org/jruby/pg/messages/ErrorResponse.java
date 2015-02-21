@@ -29,13 +29,13 @@ public class ErrorResponse extends BackendMessage {
 
     private byte code;
 
-  private ErrorField(int code) {
-    this.code = (byte) code;
-  }
+    private ErrorField(int code) {
+      this.code = (byte) code;
+    }
 
-  public byte getCode() {
-    return code;
-  }
+    public byte getCode() {
+      return code;
+    }
   }
 
   private final Map<Byte, String> fields;

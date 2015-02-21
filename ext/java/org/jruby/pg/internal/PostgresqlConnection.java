@@ -211,8 +211,7 @@ public class PostgresqlConnection implements ProtocolReader, ProtocolWriter {
       return PingStatus.PQPING_OK;
     } catch(IOException ex) {
       return PingStatus.PQPING_NO_RESPONSE;
-    }
-    finally {
+    } finally {
       if(conn != null) {
         conn.close();
       }
@@ -757,7 +756,7 @@ public class PostgresqlConnection implements ProtocolReader, ProtocolWriter {
    */
   public byte[] getCopyData(boolean async) throws IOException {
     if(aStatus != AsyncStatus.CopyBoth &&
-    aStatus != AsyncStatus.CopyOut) {
+        aStatus != AsyncStatus.CopyOut) {
       throw new IOException("not in copy out mode");
     }
 
@@ -937,8 +936,7 @@ public class PostgresqlConnection implements ProtocolReader, ProtocolWriter {
         return false;
       }
       return true;
-    }
-    finally {
+    } finally {
       inBuffer.reset();
     }
   }
