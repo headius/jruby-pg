@@ -215,11 +215,24 @@ describe PG::Connection do
 		From backend (#4)> 13
 		From backend> "SELECT 1"
 		From backend> Z
-		From backend (#4)> 5
+		From backend (#4)> 5} +
+    # JRuby will only print the msg header when it's ready to process
+    # the message on the other hand, libpq will print the
+    # ReadyForQuery msg header then realize it's in the Idle state
+    # stop processing and wait for the user to consume the Result.
+    # That's why we get a double 'Z' msg on MRI.
+    if jruby?
+      %{
+		From backend> T
+		}
+    else
+      %{
 		From backend> Z
 		From backend (#4)> 5
 		From backend> T
-		}.gsub( /^\t{2}/, '' ).lstrip
+		}
+    end
+
 
 	it "trace and untrace client-server communication", :unix do
 			# be careful to explicitly close files so that the
@@ -237,8 +250,8 @@ describe PG::Connection do
 
 			trace_data = trace_file.read
 
-			expected_trace_output = EXPECTED_TRACE_OUTPUT.dup
-			# For PostgreSQL < 9.0, the output will be different:
+			expected_trace_output =   EXPECTED_TRACE_OUTPUT.dup.gsub( /^\t+/, '' ).lstrip
+      # For PostgreSQL < 9.0, the output will be different:
 			# -From backend (#4)> 13
 			# -From backend> "SELECT 1"
 			# +From backend (#4)> 11
