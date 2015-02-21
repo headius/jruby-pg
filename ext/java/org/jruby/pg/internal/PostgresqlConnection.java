@@ -122,6 +122,14 @@ public class PostgresqlConnection implements ProtocolReader, ProtocolWriter {
   // used to trace the activity of the connection
   private PrintWriter tracer;
 
+  // the current notice receiver, defaults to printing the error
+  // message to standard error
+  private NoticeReceiver receiver = new NoticeReceiver() {
+    public void receive(ResultSet result) {
+      System.err.println(result.getError());
+    }
+  };
+
   /**
    * Create a new connection asynchronously using the specified
    * parameters
@@ -1877,8 +1885,9 @@ public class PostgresqlConnection implements ProtocolReader, ProtocolWriter {
       break;
 
     case NoticeResponse:
-      // todo: create a new result with the PGRES_NONFATAL_ERROR and
-      // send it to the notice receivers
+      ResultSet result = makeEmptyResult(ResultStatus.PGRES_NONFATAL_ERROR);
+      result.setErrorResponse((ErrorResponse) msg);
+      receiver.receive(result);
       break;
 
     default:

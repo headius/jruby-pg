@@ -1,5 +1,7 @@
 package org.jruby.pg.messages;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Map;
 
 public class ErrorResponse extends BackendMessage {
@@ -27,24 +29,44 @@ public class ErrorResponse extends BackendMessage {
 
     private byte code;
 
-    private ErrorField(int code) {
-      this.code = (byte) code;
-    }
+  private ErrorField(int code) {
+    this.code = (byte) code;
+  }
 
-    public byte getCode() {
-      return code;
-    }
+  public byte getCode() {
+    return code;
+  }
   }
 
   private final Map<Byte, String> fields;
+  private final String err;
 
   // the first byte of each array element is the code followed by the value
   public ErrorResponse(Map<Byte, String> fields, int length) {
     this.fields = fields;
+
+    // construct the error message
+    StringWriter sWriter = new StringWriter();
+    PrintWriter writer = new PrintWriter(sWriter);
+    String fieldVal = null;
+    if((fieldVal = getErrorField(ErrorField.PG_DIAG_SEVERITY)) != null) {
+      writer.printf("%s: ", fieldVal);
+    }
+    // only do this for verbose errors
+    // if ((fieldVal = getErrorField(PG_DIAG_SQLSTATE)) != null) {
+    //   writer.printf("%s: ", fieldVal);
+    // }
+
+    if((fieldVal = getErrorField(ErrorField.PG_DIAG_MESSAGE_PRIMARY)) != null) {
+      writer.append(fieldVal);
+    }
+
+    writer.flush();
+    err = sWriter.toString();
   }
 
   public String getErrorMessage() {
-    return getErrorField(ErrorField.PG_DIAG_MESSAGE_PRIMARY);
+    return err;
   }
 
   @Override

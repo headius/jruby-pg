@@ -916,13 +916,35 @@ public class Connection extends RubyObject {
   /******     PG::Connection INSTANCE METHODS: Notice Processing     ******/
 
   @JRubyMethod
-  public IRubyObject set_notice_receiver(ThreadContext context) {
-    return context.nil;
+  public IRubyObject set_notice_receiver(final ThreadContext context, Block block) {
+    IRubyObject oldProc = proc;
+    if(block != Block.NULL_BLOCK) {
+      proc = RubyProc.newProc(context.runtime, block, Block.Type.PROC);
+      postgresConnection.setNoticeReceiver(new NoticeReceiver() {
+        @Override
+        public void receive(ResultSet result) {
+          IRubyObject resultSet = createResult(context, result);
+          ((RubyProc)proc).call(context, new IRubyObject[] {resultSet});
+        }
+      });
+    }
+    return oldProc;
   }
 
   @JRubyMethod
-  public IRubyObject set_notice_processor(ThreadContext context) {
-    return context.nil;
+  public IRubyObject set_notice_processor(final ThreadContext context, Block block) {
+    IRubyObject oldProc = proc;
+    if(block != Block.NULL_BLOCK) {
+      proc = RubyProc.newProc(context.runtime, block, Block.Type.PROC);
+      postgresConnection.setNoticeReceiver(new NoticeReceiver() {
+        @Override
+        public void receive(ResultSet result) {
+          IRubyObject err = context.runtime.newString(result.getError());
+          ((RubyProc)proc).call(context, new IRubyObject[] {err});
+        }
+      });
+    }
+    return oldProc;
   }
 
   /******     PG::Connection INSTANCE METHODS: Other    ******/
