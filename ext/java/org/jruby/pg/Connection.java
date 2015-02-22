@@ -46,6 +46,8 @@ public class Connection extends RubyObject {
   private PostgresqlString COMMIT_QUERY = new PostgresqlString("COMMIT");
   private PostgresqlString ROLLBACK_QUERY = new PostgresqlString("ROLLBACK");
 
+  private NoticeReceiver defaultReceiver;
+
   // the cached rubyIO that is returned by socket_io
   private RubyIO rubyIO;
 
@@ -923,33 +925,53 @@ public class Connection extends RubyObject {
 
   @JRubyMethod
   public IRubyObject set_notice_receiver(final ThreadContext context, Block block) {
-    IRubyObject oldProc = proc;
-    if(block != Block.NULL_BLOCK) {
-      proc = RubyProc.newProc(context.runtime, block, Block.Type.PROC);
-      postgresConnection.setNoticeReceiver(new NoticeReceiver() {
-        @Override
-        public void receive(ResultSet result) {
-          IRubyObject resultSet = createResult(context, result);
-          ((RubyProc)proc).call(context, new IRubyObject[] {resultSet});
-        }
-      });
+    if(defaultReceiver == null) {
+      defaultReceiver = postgresConnection.setNoticeReceiver(null);
     }
+
+    // if the proc is nil, reset the notice receiver and return the
+    // previous proc
+    IRubyObject oldProc = proc;
+    if(block == Block.NULL_BLOCK) {
+      postgresConnection.setNoticeReceiver(defaultReceiver);
+      proc = context.nil;
+      return oldProc;
+    }
+
+    proc = RubyProc.newProc(context.runtime, block, Block.Type.PROC);
+    postgresConnection.setNoticeReceiver(new NoticeReceiver() {
+      @Override
+      public void receive(ResultSet result) {
+        IRubyObject resultSet = createResult(context, result);
+        ((RubyProc)proc).call(context, new IRubyObject[] {resultSet});
+      }
+    });
     return oldProc;
   }
 
   @JRubyMethod
   public IRubyObject set_notice_processor(final ThreadContext context, Block block) {
-    IRubyObject oldProc = proc;
-    if(block != Block.NULL_BLOCK) {
-      proc = RubyProc.newProc(context.runtime, block, Block.Type.PROC);
-      postgresConnection.setNoticeReceiver(new NoticeReceiver() {
-        @Override
-        public void receive(ResultSet result) {
-          IRubyObject err = context.runtime.newString(result.getError());
-          ((RubyProc)proc).call(context, new IRubyObject[] {err});
-        }
-      });
+    if(defaultReceiver == null) {
+      defaultReceiver = postgresConnection.setNoticeReceiver(null);
     }
+
+    // if the proc is nil, reset the notice receiver and return the
+    // previous proc
+    IRubyObject oldProc = proc;
+    if(block == Block.NULL_BLOCK) {
+      postgresConnection.setNoticeReceiver(defaultReceiver);
+      proc = context.nil;
+      return oldProc;
+    }
+
+    proc = RubyProc.newProc(context.runtime, block, Block.Type.PROC);
+    postgresConnection.setNoticeReceiver(new NoticeReceiver() {
+      @Override
+      public void receive(ResultSet result) {
+        IRubyObject err = context.runtime.newString(result.getError());
+        ((RubyProc)proc).call(context, new IRubyObject[] {err});
+      }
+    });
     return oldProc;
   }
 
