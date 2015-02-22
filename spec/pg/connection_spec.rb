@@ -711,6 +711,16 @@ describe PG::Connection do
 
 	it "discards previous results (if any) before waiting on an #async_exec"
 
+	it "ignore nil params" do
+    res = @conn.async_exec 'select 1 as one', nil
+    res[0]['one'].should == '1'
+  end
+
+	it "ignore nil params" do
+    res = @conn.async_exec 'select $1::boolean as b', [false]
+    res[0]['b'].should == 'f'
+  end
+
 	it "calls the block if one is provided to #async_exec" do
 		result = nil
 		@conn.async_exec( "select 47 as one" ) do |pg_res|

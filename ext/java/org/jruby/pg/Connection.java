@@ -524,7 +524,7 @@ public class Connection extends RubyObject {
     PostgresqlString query = rubyStringAsPostgresqlString(args[0]);
     ResultSet set = null;
     try {
-      if(args.length == 1) {
+      if(args.length == 1 || args[1].isNil()) {
         set = postgresConnection.exec(query);
       } else {
 
@@ -1516,16 +1516,12 @@ public class Connection extends RubyObject {
         if(value.isNil()) {
           values[i] = new Value(null, valueFormat);
         } else {
-          values[i] = new Value(((RubyString) value).getBytes(), valueFormat);
+          RubyString str = value.asString();
+          values[i] = new Value(str.getBytes(), valueFormat);
         }
       } else {
-        RubyString rubyString;
-        if(param instanceof RubyString) {
-          rubyString = (RubyString) param;
-        } else {
-          rubyString = (RubyString)((RubyObject) param).to_s();
-        }
-        values[i] = new Value(rubyString.getBytes(), valueFormat);
+        RubyString str = param.asString();
+        values[i] = new Value(str.getBytes(), valueFormat);
       }
     }
   }
