@@ -1,7 +1,6 @@
-
-Thanks to all the great people that have contributed code, suggestions, and patches through the
-years. If you contribute a patch, please include a patch for this file that adds your name to the
-list.
+Thanks to all the great people that have contributed code,
+suggestions, and patches through the years. If you contribute a patch,
+please include a patch for this file that adds your name to the list.
 
 * Dennis Vshivkov <walrus@amur.ru>
 * Gabriel Emerson <gemerson@evalsoft.com>
