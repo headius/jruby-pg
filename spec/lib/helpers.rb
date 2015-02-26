@@ -180,11 +180,12 @@ module PG::TestingHelpers
     tmp = old_log_and_run logpath, cmd
     File.open("#{@test_pgdata}/pg_hba.conf", "w") do |f|
       f.puts "# TYPE    DATABASE        USER            ADDRESS         METHOD"
-      f.puts "  hostssl all             ssl             127.0.0.1/32    password"
-      f.puts "  host    all             ssl             127.0.0.1/32    reject"
-      f.puts "  host    all             password        127.0.0.1/32    password"
-      f.puts "  host    all             encrypt         127.0.0.1/32    md5"
-      f.puts "  host    all             all             127.0.0.1/32    trust"
+      f.puts "  hostssl all             ssl             samehost        password"
+      f.puts "  host    all             ssl             samehost        reject"
+      f.puts "  host    all             password        samehost        password"
+      f.puts "  host    all             encrypt         samehost        md5"
+      f.puts "  host    all             all             samehost        trust"
+      f.puts "  local   all             all                             trust"
     end
     File.open("#{@test_pgdata}/postgresql.conf", "a") do |f|
       f.puts "ssl = yes"
@@ -243,7 +244,7 @@ module PG::TestingHelpers
 		@port = 54321
 		ENV['PGPORT'] = @port.to_s
 		ENV['PGHOST'] = 'localhost'
-		@conninfo = "host=localhost port=#{@port} dbname=test"
+		@conninfo = "host=127.0.0.1 port=#{@port} dbname=test"
 
 		@logfile = TEST_DIRECTORY + 'setup.log'
 		trace "Command output logged to #{@logfile}"
