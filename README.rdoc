@@ -37,7 +37,7 @@ not regularly tested.
 
 Install via RubyGems:
 
-    gem install jpg
+    gem install jruby-pg
 
 == Copying
 
