@@ -41,7 +41,7 @@ Install via RubyGems:
 
 Install via Bundler, in your gemfile add the following:
 
-    # Pleae note that the 1.0 is necessary to let bundler do its dependency management, as there is no .gemspec in the source.
+    # Please note that the 1.0 is necessary to let bundler do its dependency management, as there is no .gemspec in the source.
     gem 'jruby-pg', '1.0', :platform => :jruby, :git => 'git://github.com/headius/jruby-pg.git', :branch => :master
 
 == Copying
