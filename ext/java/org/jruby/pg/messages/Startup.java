@@ -19,8 +19,12 @@ public class Startup extends FrontendMessage {
     writer.writeString(user);
     writer.writeString("database");
     writer.writeString(database);
-    writer.writeString("options");
-    writer.writeString(options);
+
+    if(!options.isEmpty()) {
+      writer.writeString("options");
+      writer.writeString(options);
+    }
+
     writer.writeByte((char) 0);
   }
 
