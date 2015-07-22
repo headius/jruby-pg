@@ -37,12 +37,12 @@ not regularly tested.
 
 Install via RubyGems:
 
-    gem install jruby-pg
+    gem install pg_jruby
 
 Install via Bundler, in your gemfile add the following:
 
     # Please note that the 1.0 is necessary to let bundler do its dependency management, as there is no .gemspec in the source.
-    gem 'jruby-pg', '1.0', :platform => :jruby, :git => 'git://github.com/headius/jruby-pg.git', :branch => :master
+    gem 'pg_jruby', '0.17.1', :platform => :jruby, :git => 'git://github.com/headius/jruby-pg.git', :branch => :master
 
 == Copying
 
