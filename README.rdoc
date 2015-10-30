@@ -3,13 +3,13 @@
 This is a JRuby gem replacement for ruby-pg. The gem should be a
 drop-in replacement for ruby-pg version 0.17.1. If you see any
 inconsistency please open an issue
-{here}(https://github.com/headius/jruby-pg/issues)
+{here}[https://github.com/headius/jruby-pg/issues]
 
 = Documentation
 
 For documentation please refair to the MRI pg gem docs which you can
-find {here}(http://www.rubydoc.info/gems/pg/0.17.1/PG). The original
-ruby-pg project can be found {here on github}(https://github.com/ged/ruby-pg)
+find {here}[http://www.rubydoc.info/gems/pg/0.17.1/PG]. The original
+ruby-pg project can be found {here on github}[https://github.com/ged/ruby-pg]
 
 == Build Status
 
