@@ -5,6 +5,13 @@ drop-in replacement for ruby-pg version 0.17.1. If you see any
 inconsistency please open an issue
 {here}[https://github.com/headius/jruby-pg/issues].
 
+Another JRuby Postgres adapter is {jdbc-postgres}[https://github.com/jruby/activerecord-jdbc-adapter/tree/master/jdbc-postgres/]. jruby-pg provides a few interfaces that jdbc-postgres doesn't have. Most use cases don't require those interfaces, specially if you are using ActiveRecord. Extra APIs in the pg & jruby-pg gem include:
+
+* Async API for querying
+* Large objects API
+* Bulk Copy API
+* Notification API
+
 = Documentation
 
 For documentation please refair to the MRI pg gem docs which you can
