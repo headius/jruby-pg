@@ -44,7 +44,8 @@ Install via RubyGems:
 
 Install via Bundler, in your gemfile add the following:
 
-    # Please note that the 1.0 is necessary to let bundler do its dependency management, as there is no .gemspec in the source.
+    # Please note that Bundler version 1.0 is necessary to let bundler do its dependency management,
+    # as there is no .gemspec in the source.
     gem 'pg', '0.17.1', :platform => :jruby, :git => 'git://github.com/headius/jruby-pg.git', :branch => :master
 
     # comment the activerecord-jdbcsqlite3-adapter line
