@@ -58,6 +58,11 @@ Install via Bundler, in your gemfile add the following:
     # comment the activerecord-jdbcsqlite3-adapter line
     # gem 'activerecord-jdbcsqlite3-adapter'
 
+== Sample app
+
+See {this app}[https://github.com/jvshahid/sample-jruby-pg] for a demonstration
+of using jruby-pg with rails
+
 == Copying
 
 Copyright (c) 1997-2013 by the authors.
