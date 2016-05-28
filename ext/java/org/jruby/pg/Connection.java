@@ -26,6 +26,7 @@ import org.jruby.runtime.Block;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.runtime.encoding.EncodingService;
 import org.jruby.util.ByteList;
 
 @SuppressWarnings("serial")
@@ -1431,7 +1432,8 @@ public class Connection extends RubyObject {
 
     RubyString rubyMessage = context.runtime.newString(message);
     if(encoding != null) {
-      RubyEncoding rubyEncoding = RubyEncoding.newEncoding(context.runtime, encoding);
+      EncodingService encodingService = context.runtime.getEncodingService();
+      RubyEncoding rubyEncoding = encodingService.getEncoding(encoding);
       rubyMessage = (RubyString) rubyMessage.encode(context, rubyEncoding);
     }
     Block eBlock = Block.NULL_BLOCK;
