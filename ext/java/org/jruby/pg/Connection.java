@@ -1423,6 +1423,7 @@ public class Connection extends RubyObject {
   private RaiseException newPgErrorCommon(ThreadContext context,
                                           String message, String sqlstate,
                                           org.jcodings.Encoding encoding) {
+    Ruby runtime = context.runtime;
     RubyClass klass = lookupErrorClass(context, sqlstate);
 
     if(message == null) {
@@ -1431,7 +1432,7 @@ public class Connection extends RubyObject {
 
     RubyString rubyMessage = context.runtime.newString(message);
     if(encoding != null) {
-      RubyEncoding rubyEncoding = RubyEncoding.newEncoding(context.runtime, encoding);
+      RubyEncoding rubyEncoding = (RubyEncoding) runtime.getEncodingService().convertEncodingToRubyEncoding(encoding);
       rubyMessage = (RubyString) rubyMessage.encode(context, rubyEncoding);
     }
     Block eBlock = Block.NULL_BLOCK;
