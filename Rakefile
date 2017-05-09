@@ -36,9 +36,9 @@ CLOBBER.include( TEST_DIRECTORY.to_s )
 CLEAN.include( PKGDIR.to_s, TMPDIR.to_s )
 
 # Set up Hoe plugins
-Hoe.plugin :mercurial
-Hoe.plugin :signing
-Hoe.plugin :deveiate
+#Hoe.plugin :mercurial
+#Hoe.plugin :signing
+#Hoe.plugin :deveiate
 Hoe.plugin :bundler
 
 Hoe.plugins.delete :rubyforge
@@ -49,13 +49,14 @@ def jruby?
 end
 
 # Hoe specification
-$hoespec = Hoe.spec 'pg' do
-	self.readme_file = 'README.rdoc'
+$hoespec = Hoe.spec jruby? ? 'jruby-pg' : 'pg' do
+	#self.readme_file = 'README.rdoc'
 	self.history_file = 'History.rdoc'
 	self.extra_rdoc_files = Rake::FileList[ '*.rdoc' ]
 	self.extra_rdoc_files.include( 'POSTGRES', 'LICENSE' )
 	self.extra_rdoc_files.include( 'ext/*.c' )
 
+        self.developer 'Charles Nutter', 'headius@headius.com'
 	self.developer 'John Shahid', 'jvshahid@gmail.com'
 
 	self.dependency 'rake-compiler', '~> 0.9', :developer
@@ -63,12 +64,14 @@ $hoespec = Hoe.spec 'pg' do
 	self.dependency 'hoe-deveiate', '~> 0.2', :developer
 	self.dependency 'hoe-bundler', '~> 1.0', :developer
 
-	self.spec_extras[:licenses] = ['BSD', 'Ruby', 'GPL']
+	self.spec_extras[:licenses] = ['BSD-2-Clause', 'Ruby']
 	self.spec_extras[:extensions] = [ 'ext/extconf.rb' ] unless jruby?
+
+        self.license 'Ruby'
 
   self.spec_extras[:files] = Proc.new do |f|
     self.spec_extras[:files] = f << 'lib/pg_ext.jar'
-  end
+  end if jruby?
 
 	self.require_ruby_version( '>= 1.8.7' )
 
@@ -81,7 +84,9 @@ $hoespec = Hoe.spec 'pg' do
 	]
 
 	self.rdoc_locations << "deveiate:/usr/local/www/public/code/#{remote_rdoc_dir}"
+
   self.spec_extras[:platform] = 'java' if jruby?
+  self.version = '0.1' if jruby?
 end
 
 if jruby?
@@ -189,17 +194,18 @@ end
 def error_codes_file
   if jruby?
     return 'ext/java/Errors.java'
+  else
+    'ext/errorcodes.def'
   end
-  'ext/errorcodes.def'
 end
 
 file error_codes_file => ['ext/errorcodes.rb', 'ext/errorcodes.txt'] do
 	ruby 'ext/errorcodes.rb', 'ext/errorcodes.txt', error_codes_file
 end
 
-file 'ext/pg_errors.c' => ['ext/errorcodes.def'] do
-	# trigger compilation of changed errorcodes.def
-	touch 'ext/pg_errors.c'
-end
+#file 'ext/pg_errors.c' => ['ext/errorcodes.def'] do
+#	# trigger compilation of changed errorcodes.def
+#	touch 'ext/pg_errors.c'
+#end
 
 file 'ext/java/PgExtService.java' => error_codes_file
