@@ -63,6 +63,11 @@ Install via Bundler, in your gemfile add the following:
 See {this app}[https://github.com/jvshahid/sample-jruby-pg] for a demonstration
 of using jruby-pg with rails
 
+Install via Bundler, in your gemfile add the following:
+
+    # Please note that the 1.0 is necessary to let bundler do its dependency management, as there is no .gemspec in the source.
+    gem 'jruby-pg', '1.0', :platform => :jruby, :git => 'git://github.com/headius/jruby-pg.git', :branch => :master
+
 == Copying
 
 Copyright (c) 1997-2013 by the authors.
